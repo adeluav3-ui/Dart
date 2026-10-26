@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { X, Search, Navigation } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
@@ -33,11 +33,13 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   const [search, setSearch] = useState('')
   const [locating, setLocating] = useState(false)
   const [locError, setLocError] = useState('')
-  const [showWaitlist, setShowWaitlist] = useState(false)
-  const [waitlistArea, setWaitlistArea] = useState('')
+  // waitlistArea: '' = custom, non-empty string = pre-filled from coming-soon tap
+  const [waitlistArea, setWaitlistArea] = useState<string | null>(null)
+  const [waitlistAreaName, setWaitlistAreaName] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistSent, setWaitlistSent] = useState(false)
   const [waitlistSaving, setWaitlistSaving] = useState(false)
+  const waitlistRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
   const normalizedSearch = normalizeText(search)
@@ -51,7 +53,6 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
     )
   })
 
-  // Group by zone_id, preserving order of first appearance
   type Group = { zoneId: string | null; zoneName: string; areas: Area[] }
   const groups: Group[] = []
   const seen = new Set<string | null>()
@@ -81,30 +82,38 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
           if (dist < nearestDist) { nearestDist = dist; nearest = a }
         }
         setLocating(false)
-        if (nearest && nearestDist <= 3) {
+        if (nearest && nearestDist <= 5) {
           setSelected(nearest.id)
         } else {
-          setLocError('No delivery area within 3 km. Select manually.')
+          setLocError('Couldn\'t detect your area automatically. Please select it below.')
         }
       },
       err => {
         setLocating(false)
         setLocError(
           err.code === 1
-            ? 'Location access denied. Select your area manually.'
-            : 'Could not get location. Select your area manually.'
+            ? 'Location access denied. Select your area below.'
+            : 'Could not get location. Select your area below.'
         )
       },
       { timeout: 8000 }
     )
   }
 
+  function openWaitlist(prefilledName?: string) {
+    setWaitlistArea(prefilledName ?? '')
+    setWaitlistAreaName(prefilledName ?? '')
+    setWaitlistSent(false)
+    // scroll to waitlist form
+    setTimeout(() => waitlistRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
+
   async function submitWaitlist() {
-    if (!waitlistArea.trim()) return
+    if (!waitlistAreaName.trim()) return
     setWaitlistSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('area_requests').insert({
-      area_name: waitlistArea.trim(),
+      area_name: waitlistAreaName.trim(),
       user_id: user?.id ?? null,
       email: waitlistEmail.trim() || null,
     })
@@ -122,9 +131,12 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
+      {/* Backdrop — z-[60] covers BottomNav (z-50) */}
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
+
+      {/* Sheet */}
       <div
-        className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl max-w-md mx-auto flex flex-col"
+        className="fixed inset-x-0 bottom-0 z-[60] bg-white rounded-t-3xl max-w-md mx-auto flex flex-col"
         style={{ maxHeight: '88dvh', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {/* Header */}
@@ -191,11 +203,16 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
                   <button
                     key={area.id}
                     type="button"
-                    disabled={isComing}
-                    onClick={() => setSelected(area.id)}
+                    onClick={() => {
+                      if (isComing) {
+                        openWaitlist(area.name)
+                      } else {
+                        setSelected(area.id)
+                      }
+                    }}
                     className={`flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-left mb-1 transition-colors ${
                       isComing
-                        ? 'opacity-50 cursor-not-allowed'
+                        ? 'hover:bg-surface active:bg-surface'
                         : isSelected
                         ? 'bg-brand-tint'
                         : 'hover:bg-surface active:bg-surface'
@@ -207,7 +224,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
                     <span className="flex items-center gap-2 shrink-0">
                       {isComing && (
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface text-ink-2">
-                          Coming soon
+                          Notify me
                         </span>
                       )}
                       {isSelected && !isComing && (
@@ -224,30 +241,47 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
             </div>
           ))}
 
-          {/* Waitlist */}
-          <div className="mb-4 mt-1">
-            {!showWaitlist ? (
+          {/* Waitlist section */}
+          <div ref={waitlistRef} className="mb-4 mt-1">
+            {waitlistArea === null ? (
               <button
                 type="button"
-                onClick={() => setShowWaitlist(true)}
+                onClick={() => openWaitlist()}
                 className="text-[14px] font-semibold text-brand px-1"
               >
                 My area isn&apos;t listed →
               </button>
             ) : waitlistSent ? (
               <div className="px-4 py-3 rounded-2xl bg-brand-tint text-brand-ink text-[14px] font-medium">
-                Got it! We&apos;ll reach out when we expand there.
+                {waitlistAreaName
+                  ? `Got it! We'll let you know when we start delivering to ${waitlistAreaName}.`
+                  : "Got it! We'll reach out when we expand there."}
               </div>
             ) : (
               <div className="flex flex-col gap-2 p-4 rounded-2xl bg-surface">
-                <p className="text-[13px] font-semibold text-ink">We&apos;ll expand when there&apos;s enough demand</p>
-                <input
-                  type="text"
-                  placeholder="Your area (e.g. Ofin bus stop)"
-                  value={waitlistArea}
-                  onChange={e => setWaitlistArea(e.target.value)}
-                  className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white"
-                />
+                <div className="flex items-center justify-between">
+                  <p className="text-[13px] font-semibold text-ink">
+                    {waitlistArea
+                      ? `Join waitlist for ${waitlistArea}`
+                      : "We'll expand when there's enough demand"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setWaitlistArea(null)}
+                    className="text-ink-2"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {!waitlistArea && (
+                  <input
+                    type="text"
+                    placeholder="Your area name"
+                    value={waitlistAreaName}
+                    onChange={e => setWaitlistAreaName(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white"
+                  />
+                )}
                 <input
                   type="email"
                   placeholder="Email for updates (optional)"

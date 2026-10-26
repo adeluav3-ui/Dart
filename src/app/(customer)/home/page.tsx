@@ -18,7 +18,7 @@ export default async function HomePage() {
       .order('is_open', { ascending: false })
       .order('rating_avg', { ascending: false }),
     supabase.from('zones').select('*').eq('is_active', true).order('name'),
-    supabase.from('areas').select('*').order('sort_order'),
+    supabase.from('areas').select('*').order('status').order('sort_order'),
     supabase.from('zone_fares').select('*'),
   ])
 
