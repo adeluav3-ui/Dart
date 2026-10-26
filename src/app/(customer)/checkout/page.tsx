@@ -17,7 +17,9 @@ export default function CheckoutPage() {
 
   const [zones, setZones] = useState<Zone[]>([])
   const [fares, setFares] = useState<ZoneFare[]>([])
-  const [customerZoneId, setCustomerZoneId] = useState('')
+  const [customerZoneId, setCustomerZoneId] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('dart_zone_id') ?? '' : '')
+  )
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
   const [phone, setPhone] = useState('')
@@ -149,7 +151,10 @@ export default function CheckoutPage() {
             Area
             <select
               value={customerZoneId}
-              onChange={e => setCustomerZoneId(e.target.value)}
+              onChange={e => {
+                setCustomerZoneId(e.target.value)
+                localStorage.setItem('dart_zone_id', e.target.value)
+              }}
               className="h-btn-sm px-3 rounded-xl border border-line bg-white font-body text-[15px] text-ink font-medium"
             >
               {zones.map(z => (
