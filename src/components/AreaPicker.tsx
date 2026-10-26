@@ -83,7 +83,9 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
         }
         setLocating(false)
         if (!nearest || nearestDist > 15) {
-          setLocError('You appear to be outside our delivery range. Select your area below.')
+          // Outside all known areas — open blank waitlist so they can register their location
+          openWaitlist('')
+          setLocError('We don\'t deliver to your area yet. Tell us where you are and we\'ll notify you when we expand there.')
         } else if (nearest.status === 'active') {
           setSelected(nearest.id)
         } else {
