@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Mail } from 'lucide-react'
@@ -9,7 +9,7 @@ import { DartLogo } from '@/components/ui/DartLogo'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
-type Step = 'email' | 'otp' | 'profile'
+type Step = 'email' | 'sent' | 'profile'
 
 function roleHome(role: string | null | undefined) {
   if (role === 'vendor') return '/vendor'
@@ -18,81 +18,10 @@ function roleHome(role: string | null | undefined) {
   return '/home'
 }
 
-// ── OTP input: 6 separate boxes ──────────────────────────────────────────────
-function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const refs = useRef<(HTMLInputElement | null)[]>([])
-
-  function focus(i: number) {
-    refs.current[i]?.focus()
-  }
-
-  function handleKey(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace') {
-      e.preventDefault()
-      if (value[i]) {
-        // clear current slot
-        onChange(value.slice(0, i) + value.slice(i + 1))
-      } else if (i > 0) {
-        // clear previous slot and move focus back
-        onChange(value.slice(0, i - 1) + value.slice(i))
-        focus(i - 1)
-      }
-    }
-  }
-
-  function handleChange(i: number, e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/\D/g, '')
-    if (!raw) return
-
-    // paste handling: fill from position i
-    const digits = raw.slice(0, 6 - i)
-    const arr = (value || '').padEnd(6, '').split('')
-    for (let j = 0; j < digits.length; j++) {
-      arr[i + j] = digits[j]
-    }
-    const newVal = arr.join('').slice(0, 6)
-    onChange(newVal)
-    const nextFocus = Math.min(i + digits.length, 5)
-    setTimeout(() => focus(nextFocus), 0)
-  }
-
-  function handlePaste(e: React.ClipboardEvent) {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (pasted.length > 0) {
-      onChange(pasted.padEnd(6, '').slice(0, 6))
-      setTimeout(() => focus(Math.min(pasted.length, 5)), 0)
-    }
-    e.preventDefault()
-  }
-
-  return (
-    <div className="flex gap-2" onPaste={handlePaste}>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <input
-          key={i}
-          ref={el => { refs.current[i] = el }}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={1}
-          value={value[i] ?? ''}
-          onChange={e => handleChange(i, e)}
-          onKeyDown={e => handleKey(i, e)}
-          onClick={() => focus(i)}
-          className={`flex-1 aspect-square rounded-2xl border-2 text-center text-xl font-bold font-body text-ink bg-white outline-none transition-colors focus:border-brand ${value[i] ? 'border-brand' : 'border-line'
-            }`}
-          aria-label={`Digit ${i + 1}`}
-        />
-      ))}
-    </div>
-  )
-}
-
 // ── Main form ─────────────────────────────────────────────────────────────────
 export function LoginForm() {
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
@@ -111,14 +40,6 @@ export function LoginForm() {
     if (startComplete) setStep('profile')
   }, [startComplete])
 
-  // Auto-advance OTP when all 6 digits are filled
-  useEffect(() => {
-    if (otp.replace(/\D/g, '').length === 6) {
-      verifyCode()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otp])
-
   function startResendTimer() {
     setResendSeconds(45)
     timerRef.current = setInterval(() => {
@@ -129,7 +50,7 @@ export function LoginForm() {
     }, 1000)
   }
 
-  async function sendCode() {
+  async function sendLink() {
     setError('')
     if (!email.trim() || !email.includes('@')) {
       setError('Enter a valid email address')
@@ -138,50 +59,19 @@ export function LoginForm() {
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
     })
     setLoading(false)
     if (error) {
       setError(error.message)
     } else {
-      setOtp('')
-      setStep('otp')
+      setStep('sent')
       startResendTimer()
     }
   }
-
-  const verifyCode = useCallback(async () => {
-    const digits = otp.replace(/\D/g, '')
-    if (digits.length < 6) return
-    setError('')
-    setLoading(true)
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: digits,
-      type: 'email',
-    })
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-      return
-    }
-    // Check if profile is complete
-    const userId = data.user?.id
-    if (userId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', userId)
-        .single()
-      if (!profile?.full_name) {
-        setStep('profile')
-        return
-      }
-      router.replace(next === '/home' ? roleHome(profile.role) : next)
-      router.refresh()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otp, email, next])
 
   async function saveProfile() {
     setError('')
@@ -307,7 +197,7 @@ export function LoginForm() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendCode()}
+                  onKeyDown={e => e.key === 'Enter' && sendLink()}
                   className="w-full h-btn-sm pl-10 pr-4 rounded-xl border border-line bg-white font-body text-[15px] text-ink placeholder:text-ink-2/60 outline-none focus:border-brand transition-colors"
                 />
               </div>
@@ -315,7 +205,7 @@ export function LoginForm() {
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <Button onClick={sendCode} loading={loading} fullWidth size="lg">
+            <Button onClick={sendLink} loading={loading} fullWidth size="lg">
               Continue with email
             </Button>
           </div>
@@ -324,50 +214,40 @@ export function LoginForm() {
     )
   }
 
-  // ── Step: OTP ─────────────────────────────────────────────────────────────
-  if (step === 'otp') {
+  // ── Step: link sent ───────────────────────────────────────────────────────
+  if (step === 'sent') {
     return (
       <div className="min-h-dvh bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <TopBar onBack={() => { setStep('email'); setOtp(''); setError('') }} />
+        <TopBar onBack={() => { setStep('email'); setError('') }} />
 
-        <div className="flex-1 flex flex-col px-6 pt-6 pb-8 gap-8">
+        <div className="flex-1 flex flex-col px-6 pt-6 pb-8 gap-6">
           <div className="flex flex-col gap-2">
-            <h1 className="font-heading font-extrabold text-[28px] text-ink">Enter your code</h1>
+            <h1 className="font-heading font-extrabold text-[28px] text-ink">Check your email</h1>
             <p className="text-[15px] text-ink-2 leading-relaxed">
-              We sent a 6-digit code to{' '}
-              <span className="font-bold text-ink">{email}</span>.{' '}
-              Check spam if it isn&apos;t there in a minute.
+              We sent a sign-in link to{' '}
+              <span className="font-semibold text-ink">{email}</span>.
+              Tap it and you&apos;ll be signed in automatically.
             </p>
+            <p className="text-[14px] text-ink-2 mt-1">Not there? Check your spam folder.</p>
           </div>
 
-          <div className="flex flex-col gap-6">
-            <OtpInput value={otp} onChange={setOtp} />
-
-            {error && <p className="text-sm text-danger">{error}</p>}
-
-            {resendSeconds > 0 ? (
-              <p className="text-[15px] text-ink-2">
-                Resend code in{' '}
-                <span className="font-semibold text-ink">
-                  {Math.floor(resendSeconds / 60)}:{String(resendSeconds % 60).padStart(2, '0')}
-                </span>
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { sendCode(); setOtp('') }}
-                className="text-[15px] font-semibold text-brand self-start"
-              >
-                Resend code
-              </button>
-            )}
-          </div>
-
-          <div className="mt-auto">
-            <Button onClick={verifyCode} loading={loading} fullWidth size="lg">
-              Verify and continue
-            </Button>
-          </div>
+          {resendSeconds > 0 ? (
+            <p className="text-[15px] text-ink-2">
+              Resend in{' '}
+              <span className="font-semibold text-ink">
+                {Math.floor(resendSeconds / 60)}:{String(resendSeconds % 60).padStart(2, '0')}
+              </span>
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={sendLink}
+              disabled={loading}
+              className="text-[15px] font-semibold text-brand self-start disabled:opacity-60"
+            >
+              Resend link
+            </button>
+          )}
         </div>
       </div>
     )
