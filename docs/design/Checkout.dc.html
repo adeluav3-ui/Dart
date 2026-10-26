@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Checkout</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0B7A47}a:hover{color:#086138}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #F6F7F5; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #15171A; display: flex; flex-direction: column">
+
+  <header style="display: flex; align-items: center; gap: 8px; padding: 16px 16px 8px 12px; background: #F6F7F5">
+    <a href="Vendor.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#15171A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 24px; font-weight: 800">Checkout</h1>
+  </header>
+
+  <div style="padding: 4px 16px 0 16px; display: flex; flex-direction: column; gap: 12px">
+
+    <section style="background: #FFFFFF; border-radius: 16px; padding: 16px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 700">Mama Tolu's Kitchen</h2>
+        <a href="Vendor.dc.html" style="font-size: 13px; font-weight: 600; text-decoration: none">Add items</a>
+      </div>
+      <div style="display: flex; gap: 12px; margin-top: 12px; align-items: flex-start">
+        <span style="font-size: 13px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: #F3F4F2">2×</span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 14px; font-weight: 600">Jollof rice + chicken</span>
+          <span style="font-size: 13px; color: #5B6168">Chicken</span>
+        </span>
+        <span style="font-size: 14px; font-weight: 600">₦7,000</span>
+      </div>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Deliver to</h2>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #5B6168">Area
+        <select style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #E6E8EB; background: #FFFFFF; font: inherit; font-size: 15px; font-weight: 500; color: #15171A">
+          <option>OOUTH and hospital road</option>
+        </select>
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #5B6168">Landmark (required)
+        <input type="text" value="Physiotherapy dept, beside the main car park" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #E6E8EB; font: inherit; font-size: 15px; font-weight: 500; color: #15171A">
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #5B6168">Phone for the rider
+        <input type="tel" value="0803 000 0000" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #E6E8EB; font: inherit; font-size: 15px; font-weight: 500; color: #15171A">
+      </label>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+      <h2 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700">Summary</h2>
+      <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #5B6168">Food</span><span>₦7,000</span></div>
+      <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #5B6168">Delivery · OOUTH area</span><span>₦[FEE]</span></div>
+      <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #5B6168">Service fee</span><span>₦[FEE]</span></div>
+      <div style="height: 1px; background: #EEF0F2; margin: 4px 0"></div>
+      <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 700"><span>Total</span><span>₦[TOTAL]</span></div>
+    </section>
+  </div>
+
+  <div style="margin-top: auto; padding: 12px 16px 20px 16px; background: #FFFFFF; border-top: 1px solid #E6E8EB; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; gap: 8px; align-items: flex-start">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+      <span style="font-size: 12px; line-height: 1.45; color: #5B6168">Card, transfer or USSD. The kitchen starts cooking only after your payment is confirmed; if they can't take the order, you're refunded at once.</span>
+    </div>
+    <a href="Tracking.dc.html" style="height: 56px; border-radius: 16px; background: #0B7A47; color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700">Pay ₦[TOTAL]</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

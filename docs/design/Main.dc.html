@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0B7A47}a:hover{color:#086138}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #15171A; display: flex; flex-direction: column">
+
+  <div style="display: flex; align-items: center; gap: 6px; padding: 20px 20px 0 20px">
+    <svg width="30" height="30" viewBox="0 0 120 120" role="img" aria-label="Dart"><circle cx="50" cy="74" r="32" fill="none" stroke="#0B7A47" stroke-width="14"></circle><circle cx="50" cy="74" r="10" fill="#F26A1B"></circle><polygon points="82,24 96,12 96,113 82,113" fill="#0B7A47"></polygon></svg>
+    <span aria-hidden="true" style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -1px; color: #15171A; margin-top: -4px">dart</span>
+  </div>
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 12px 20px">
+    <button type="button" style="display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; min-height: 44px; font: inherit; color: inherit; text-align: left; cursor: pointer">
+      <span style="width: 36px; height: 36px; border-radius: 18px; background: #E7F4EC; display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+      </span>
+      <span style="display: flex; flex-direction: column">
+        <span style="font-size: 12px; color: #5B6168">Deliver to</span>
+        <span style="font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 4px">OOUTH main gate
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#15171A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+        </span>
+      </span>
+    </button>
+    <button type="button" aria-label="Cart" style="width: 44px; height: 44px; border-radius: 22px; border: 1px solid #E6E8EB; background: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15171A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 7z"></path><path d="M9 7V6a3 3 0 0 1 6 0v1"></path></svg>
+    </button>
+  </header>
+
+  <div style="padding: 4px 20px 0 20px; display: flex; flex-direction: column; gap: 14px">
+    <h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -0.5px">What are you eating today?</h1>
+
+    <label style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 14px; background: #F3F4F2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6168" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <input type="search" aria-label="Search food or vendors" placeholder="Search jollof, amala, shawarma…" style="flex: 1; border: 0; background: transparent; font: inherit; font-size: 15px; color: #15171A; outline: none">
+    </label>
+
+    <div style="display: flex; gap: 8px; overflow: hidden">
+      <button type="button" style="flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 0; background: #15171A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600">All</button>
+      <button type="button" style="flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid #E6E8EB; background: #FFFFFF; color: #15171A; font: inherit; font-size: 14px; font-weight: 500">Rice</button>
+      <button type="button" style="flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid #E6E8EB; background: #FFFFFF; color: #15171A; font: inherit; font-size: 14px; font-weight: 500">Swallow</button>
+      <button type="button" style="flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid #E6E8EB; background: #FFFFFF; color: #15171A; font: inherit; font-size: 14px; font-weight: 500">Grills</button>
+      <button type="button" style="flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid #E6E8EB; background: #FFFFFF; color: #15171A; font: inherit; font-size: 14px; font-weight: 500">Snacks</button>
+      <button type="button" style="flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid #E6E8EB; background: #FFFFFF; color: #15171A; font: inherit; font-size: 14px; font-weight: 500">Drinks</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: #E7F4EC">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+      <span style="font-size: 13px; line-height: 1.35; color: #0A4F30"><b>Every kitchen visited by us.</b> Photos are real food from that vendor.</span>
+    </div>
+
+    <h2 style="margin: 6px 0 0 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; font-weight: 700">Open now</h2>
+
+    <sc-for list="{{vendors}}" as="v" hint-placeholder-count="3">
+      <a href="Vendor.dc.html" style="display: flex; gap: 12px; align-items: stretch; text-decoration: none; color: #15171A">
+        <div style="width: 104px; height: 88px; flex: none; border-radius: 14px; background: #EDE6DA; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box">
+          <span style="font-size: 11px; line-height: 1.3; color: #6B5E4B; text-align: center">{{v.photo}}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0">
+          <div style="display: flex; align-items: center; gap: 6px">
+            <span style="font-size: 16px; font-weight: 700">{{v.name}}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" role="img" aria-label="Verified"><circle cx="12" cy="12" r="10" fill="#0B7A47"></circle><path d="M8 12.5l2.6 2.5L16 9.5" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+          <span style="font-size: 13px; color: #5B6168">{{v.cuisine}}</span>
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #15171A">
+            <span style="display: flex; align-items: center; gap: 4px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6168" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>{{v.eta}}
+            </span>
+            <sc-if value="{{v.rated}}" hint-placeholder-val="{{ true }}">
+              <span style="display: flex; align-items: center; gap: 4px; font-weight: 600">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="#F5A524"></path></svg>{{v.rating}} <span style="font-weight: 400; color: #5B6168">({{v.reviews}})</span>
+              </span>
+            </sc-if>
+            <sc-if value="{{v.isNew}}" hint-placeholder-val="{{ false }}">
+              <span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #F3F4F2; color: #3D4248">New</span>
+            </sc-if>
+          </div>
+        </div>
+      </a>
+    </sc-for>
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; box-sizing: border-box; padding: 8px 12px 16px 12px; background: #FFFFFF; border-top: 1px solid #E6E8EB; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr))">
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #0B7A47; font-size: 12px; font-weight: 700">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #5B6168; font-size: 12px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5B6168" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"></path><path d="M9 9h6M9 13h4"></path></svg>Orders</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #5B6168; font-size: 12px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5B6168" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M16 12.5h2M3 10h18"></path></svg>Wallet</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #5B6168; font-size: 12px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5B6168" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>Account</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const vendors = [
+      { name: "Mama Tolu's Kitchen", cuisine: 'Amala, ewedu, rice', eta: '20–30 min', rated: true, rating: '4.7', reviews: '36', photo: 'Photo · amala, ewedu and assorted meat' },
+      { name: 'Remo Rice House', cuisine: 'Jollof, fried rice, chicken', eta: '15–25 min', rated: false, photo: 'Photo · jollof rice with chicken' },
+      { name: 'The Shawarma Spot', cuisine: 'Shawarma, burgers, drinks', eta: '25–35 min', rated: false, photo: 'Photo · chicken shawarma' },
+      { name: 'Corner Grills', cuisine: 'Suya, asun, grilled fish', eta: '30–40 min', rated: false, photo: 'Photo · beef suya' }
+    ];
+    return { vendors: vendors.map(v => ({ ...v, isNew: !v.rated })) };
+  }
+}
+</script>
+</body>
+</html>

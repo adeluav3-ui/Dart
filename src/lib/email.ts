@@ -1,0 +1,197 @@
+import { Resend } from 'resend'
+import { formatMoney, formatTime } from '@/lib/format'
+
+const resend = new Resend(process.env.RESEND_API_KEY!)
+const FROM = 'Dart Delivery <orders@dartdelivery.ng>'
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function html(body: string) {
+  return `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#15171A;max-width:480px;margin:0 auto;padding:24px">${body}</body></html>`
+}
+
+function btn(href: string, label: string) {
+  return `<a href="${href}" style="display:inline-block;background:#0B7A47;color:#fff;font-weight:700;padding:14px 28px;border-radius:14px;text-decoration:none;margin-top:16px">${label}</a>`
+}
+
+// ── email types ───────────────────────────────────────────────────────────────
+
+export async function sendOrderPaidEmail({
+  to,
+  orderCode,
+  deliveryPin,
+  total,
+  orderId,
+}: {
+  to: string
+  orderCode: string
+  deliveryPin: string
+  total: number
+  orderId: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Order ${orderCode} confirmed — your code is ${deliveryPin}`,
+    html: html(`
+      <h2 style="color:#0B7A47;margin-bottom:4px">Payment received!</h2>
+      <p>Your order <strong>${orderCode}</strong> is confirmed.</p>
+      <p>When your rider arrives, give them this PIN:</p>
+      <div style="font-size:40px;font-weight:800;letter-spacing:8px;color:#0B7A47;margin:16px 0">${deliveryPin}</div>
+      <p style="color:#5B6168;font-size:14px">Total paid: ${formatMoney(total)}</p>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/track/${orderId}`, 'Track your order')}
+    `),
+  })
+}
+
+export async function sendRiderAssignedEmail({
+  to,
+  orderCode,
+  riderName,
+  riderPhone,
+}: {
+  to: string
+  orderCode: string
+  riderName: string
+  riderPhone: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Rider on the way — order ${orderCode}`,
+    html: html(`
+      <h2>Your rider is on the way</h2>
+      <p>Order <strong>${orderCode}</strong></p>
+      <p><strong>${riderName}</strong> has picked up your order and is heading to you.</p>
+      <p>If you need to reach them: <a href="tel:${riderPhone}">${riderPhone}</a></p>
+    `),
+  })
+}
+
+export async function sendOrderPickedUpEmail({
+  to,
+  orderCode,
+  deliveryPin,
+}: {
+  to: string
+  orderCode: string
+  deliveryPin: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Rider is on the way — order ${orderCode}`,
+    html: html(`
+      <h2>Your order is on the way!</h2>
+      <p>Order <strong>${orderCode}</strong> has been picked up and is heading to you.</p>
+      <p>Your delivery PIN:</p>
+      <div style="font-size:40px;font-weight:800;letter-spacing:8px;color:#0B7A47;margin:16px 0">${deliveryPin}</div>
+      <p style="color:#5B6168;font-size:13px">Give this PIN to your rider to confirm delivery.</p>
+    `),
+  })
+}
+
+export async function sendOrderDeliveredEmail({
+  to,
+  orderCode,
+  orderId,
+}: {
+  to: string
+  orderCode: string
+  orderId: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Order ${orderCode} delivered — how was it?`,
+    html: html(`
+      <h2>Order delivered!</h2>
+      <p>Your order <strong>${orderCode}</strong> has been delivered. Enjoy!</p>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/rate/${orderId}`, 'Leave a review')}
+    `),
+  })
+}
+
+export async function sendRefundEmail({
+  to,
+  orderCode,
+  amount,
+}: {
+  to: string
+  orderCode: string
+  amount: number
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Refund for order ${orderCode}`,
+    html: html(`
+      <h2>Refund processed</h2>
+      <p>Order <strong>${orderCode}</strong> was cancelled.</p>
+      <p><strong>${formatMoney(amount)}</strong> has been added to your Dart wallet and will appear on your next order.</p>
+    `),
+  })
+}
+
+// ── admin alert emails ────────────────────────────────────────────────────────
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'adeluav3@gmail.com'
+
+export async function sendAdminVendorUnresponsiveEmail({
+  vendorName,
+  orderCode,
+  vendorPhone,
+}: {
+  vendorName: string
+  orderCode: string
+  vendorPhone: string | null
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `⚠️ Vendor hasn't responded — ${orderCode}`,
+    html: html(`
+      <h2>Vendor not responding</h2>
+      <p><strong>${vendorName}</strong> has not accepted or rejected order <strong>${orderCode}</strong> after 3 minutes.</p>
+      ${vendorPhone ? `<p>Call them: <a href="tel:${vendorPhone}">${vendorPhone}</a></p>` : ''}
+    `),
+  })
+}
+
+export async function sendAdminNoRiderEmail({
+  vendorName,
+  orderCode,
+}: {
+  vendorName: string
+  orderCode: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `⚠️ No rider available — ${orderCode}`,
+    html: html(`
+      <h2>No rider available</h2>
+      <p>Order <strong>${orderCode}</strong> from <strong>${vendorName}</strong> has no rider. The vendor has flagged that no rider is free.</p>
+    `),
+  })
+}
+
+export async function sendAdminNoRiderAssignedEmail({
+  vendorName,
+  orderCode,
+  acceptedAt,
+}: {
+  vendorName: string
+  orderCode: string
+  acceptedAt: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `⚠️ No rider assigned 10 min after acceptance — ${orderCode}`,
+    html: html(`
+      <h2>Rider not assigned</h2>
+      <p>Order <strong>${orderCode}</strong> from <strong>${vendorName}</strong> was accepted at ${formatTime(acceptedAt)} but no rider has been assigned after 10 minutes.</p>
+    `),
+  })
+}
