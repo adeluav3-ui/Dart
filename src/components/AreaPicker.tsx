@@ -77,15 +77,19 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
         let nearest: Area | null = null
         let nearestDist = Infinity
         for (const a of areas) {
-          if (a.status !== 'active' || a.lat == null || a.lng == null) continue
+          if (a.lat == null || a.lng == null) continue  // search ALL areas, not just active
           const dist = haversineKm(lat, lng, a.lat, a.lng)
           if (dist < nearestDist) { nearestDist = dist; nearest = a }
         }
         setLocating(false)
-        if (nearest && nearestDist <= 5) {
+        if (!nearest || nearestDist > 15) {
+          setLocError('You appear to be outside our delivery range. Select your area below.')
+        } else if (nearest.status === 'active') {
           setSelected(nearest.id)
         } else {
-          setLocError('Couldn\'t detect your area automatically. Please select it below.')
+          // User is in a coming-soon area — offer waitlist
+          openWaitlist(nearest.name)
+          setLocError(`We don't deliver to ${nearest.name} yet — but you can join the waitlist below.`)
         }
       },
       err => {
