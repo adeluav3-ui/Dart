@@ -28,6 +28,21 @@ function normalizeText(s: string) {
   return s.toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { headers: { 'User-Agent': 'Dart Delivery (dart.app)' } }
+    )
+    if (!res.ok) return ''
+    const data = await res.json()
+    const a = data.address ?? {}
+    return a.suburb ?? a.neighbourhood ?? a.city_district ?? a.village ?? a.town ?? a.city ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props) {
   const [selected, setSelected] = useState(selectedId)
   const [search, setSearch] = useState('')
@@ -72,26 +87,34 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
     setLocating(true)
     setLocError('')
     navigator.geolocation.getCurrentPosition(
-      pos => {
+      async pos => {
         const { latitude: lat, longitude: lng } = pos.coords
         let nearest: Area | null = null
         let nearestDist = Infinity
         for (const a of areas) {
-          if (a.lat == null || a.lng == null) continue  // search ALL areas, not just active
+          if (a.lat == null || a.lng == null) continue
           const dist = haversineKm(lat, lng, a.lat, a.lng)
           if (dist < nearestDist) { nearestDist = dist; nearest = a }
         }
-        setLocating(false)
+
         if (!nearest || nearestDist > 15) {
-          // Outside all known areas — open blank waitlist so they can register their location
-          openWaitlist('')
-          setLocError('We don\'t deliver to your area yet. Tell us where you are and we\'ll notify you when we expand there.')
+          // Outside all known areas — reverse-geocode to get their actual place name
+          const detected = await reverseGeocode(lat, lng)
+          setLocating(false)
+          openWaitlist(detected)
+          setLocError(
+            detected
+              ? `We don't deliver to ${detected} yet. Join the waitlist and we'll notify you when we start.`
+              : 'We don\'t deliver to your area yet. Tell us where you are and we\'ll notify you.'
+          )
         } else if (nearest.status === 'active') {
+          setLocating(false)
           setSelected(nearest.id)
         } else {
-          // User is in a coming-soon area — offer waitlist
+          // In a coming-soon area
+          setLocating(false)
           openWaitlist(nearest.name)
-          setLocError(`We don't deliver to ${nearest.name} yet — but you can join the waitlist below.`)
+          setLocError(`We don't deliver to ${nearest.name} yet — join the waitlist below.`)
         }
       },
       err => {
