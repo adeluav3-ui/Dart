@@ -23,4 +23,11 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  /* Safe-area-aware bottom padding for pages with bottom nav */
+  .pb-nav {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+  .pb-nav-cart {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom));
+  }
 }

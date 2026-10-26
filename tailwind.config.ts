@@ -37,6 +37,27 @@ const config: Config = {
         'btn': '56px',
         'btn-sm': '44px',
       },
+      keyframes: {
+        'splash-logo': {
+          '0%': { transform: 'scale(0.6)', opacity: '0' },
+          '70%': { transform: 'scale(1.06)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'splash-text': {
+          '0%, 30%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'splash-dot': {
+          '0%, 50%': { transform: 'scale(0)', opacity: '0' },
+          '80%': { transform: 'scale(1.4)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+      },
+      animation: {
+        'splash-logo': 'splash-logo 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        'splash-text': 'splash-text 0.6s ease-out 0.55s both',
+        'splash-dot': 'splash-dot 0.5s ease-out 0.65s both',
+      },
     },
   },
   plugins: [],

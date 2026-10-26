@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, MapPin, ChevronDown, ShoppingCart, Star, Clock, ShieldCheck } from 'lucide-react'
+import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck } from 'lucide-react'
 import { DartLogo } from '@/components/ui/DartLogo'
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
 import { formatMoney } from '@/lib/format'
@@ -28,6 +28,7 @@ export function HomeClient({ vendors, zones }: Props) {
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
   const { cart } = useCart()
+  const itemCount = cart ? cartItemCount(cart) : 0
 
   const filtered = useMemo(() => {
     return vendors.filter(v => {
@@ -44,16 +45,30 @@ export function HomeClient({ vendors, zones }: Props) {
   const closed = filtered.filter(v => !v.is_open)
 
   return (
-    <div className="min-h-screen bg-white font-body text-ink flex flex-col">
+    <div className={`flex flex-col font-body text-ink ${itemCount > 0 ? 'pb-nav-cart' : 'pb-nav'}`}>
       {/* Logo bar */}
-      <div className="flex items-center gap-1.5 px-5 pt-5">
+      <div
+        className="flex items-center justify-between px-4 pt-4 pb-1"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
+      >
         <DartLogo />
+        <Link
+          href="/checkout"
+          className="relative w-11 h-11 rounded-full border border-line bg-white flex items-center justify-center"
+        >
+          <ShoppingCart size={20} />
+          {itemCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
+              {itemCount}
+            </span>
+          )}
+        </Link>
       </div>
 
-      {/* Header */}
-      <header className="flex items-center justify-between px-5 pt-2 pb-3">
-        <button type="button" className="flex items-center gap-2.5 min-h-btn-sm text-left">
-          <span className="w-9 h-9 rounded-full bg-brand-tint flex items-center justify-center">
+      {/* Deliver to */}
+      <div className="px-4 pt-2 pb-3">
+        <button type="button" className="flex items-center gap-2.5 min-h-[44px] text-left">
+          <span className="w-9 h-9 rounded-full bg-brand-tint flex items-center justify-center flex-none">
             <MapPin size={18} stroke="#0B7A47" />
           </span>
           <span className="flex flex-col">
@@ -64,19 +79,10 @@ export function HomeClient({ vendors, zones }: Props) {
             </span>
           </span>
         </button>
+      </div>
 
-        <Link href="/checkout" className="relative w-11 h-11 rounded-full border border-line bg-white flex items-center justify-center">
-          <ShoppingCart size={20} />
-          {cart && cartItemCount(cart) > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
-              {cartItemCount(cart)}
-            </span>
-          )}
-        </Link>
-      </header>
-
-      <div className="px-5 flex flex-col gap-3.5">
-        <h1 className="font-heading font-extrabold text-[30px] leading-tight tracking-tight">
+      <div className="px-4 flex flex-col gap-3.5">
+        <h1 className="font-heading font-extrabold text-[28px] leading-tight tracking-tight">
           What are you{'\n'}ordering today?
         </h1>
 
@@ -85,9 +91,11 @@ export function HomeClient({ vendors, zones }: Props) {
           <Search size={18} stroke="#5B6168" />
           <input
             type="search"
-            placeholder={storeType === 'restaurant' ? 'Search jollof, amala, shawarma…' :
-                         storeType === 'supermarket' ? 'Search groceries, provisions…' :
-                         'Search medicine, vitamins…'}
+            placeholder={
+              storeType === 'restaurant' ? 'Search jollof, amala, shawarma…' :
+              storeType === 'supermarket' ? 'Search groceries, provisions…' :
+              'Search medicine, vitamins…'
+            }
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-transparent font-body text-[15px] text-ink outline-none placeholder:text-ink-2/60"
@@ -95,7 +103,7 @@ export function HomeClient({ vendors, zones }: Props) {
         </label>
 
         {/* Store type tabs */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4">
           {STORE_TYPES.map(t => (
             <button
               key={t.value}
@@ -114,7 +122,7 @@ export function HomeClient({ vendors, zones }: Props) {
 
         {/* Category chips (food only) */}
         {storeType === 'restaurant' && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4">
             {FOOD_CATEGORIES.map(cat => (
               <button
                 key={cat}
@@ -165,58 +173,29 @@ export function HomeClient({ vendors, zones }: Props) {
         )}
       </div>
 
-      {/* Cart sticky bar */}
-      {cart && cartItemCount(cart) > 0 && (
-        <div className="sticky bottom-0 p-4 bg-white border-t border-line">
-          <Link
-            href="/checkout"
-            className="flex items-center justify-between h-btn px-5 rounded-2xl bg-brand text-white"
-          >
-            <span className="flex items-center gap-2.5 text-[15px] font-bold">
-              <span className="min-w-[26px] h-[26px] rounded-full bg-white text-brand text-[13px] flex items-center justify-center font-bold">
-                {cartItemCount(cart)}
+      {/* Cart bar — fixed, sits above bottom nav */}
+      {itemCount > 0 && (
+        <div
+          className="fixed inset-x-0 px-4 z-40"
+          style={{ bottom: 'calc(64px + env(safe-area-inset-bottom) + 8px)' }}
+        >
+          <div className="max-w-md mx-auto">
+            <Link
+              href="/checkout"
+              className="flex items-center justify-between h-btn px-5 rounded-2xl bg-brand text-white shadow-lg"
+            >
+              <span className="flex items-center gap-2.5 text-[15px] font-bold">
+                <span className="min-w-[26px] h-[26px] rounded-full bg-white text-brand text-[13px] flex items-center justify-center font-bold">
+                  {itemCount}
+                </span>
+                View cart
               </span>
-              View cart
-            </span>
-            <span className="text-base font-bold">{formatMoney(cartSubtotal(cart))}</span>
-          </Link>
+              <span className="text-base font-bold">{formatMoney(cartSubtotal(cart!))}</span>
+            </Link>
+          </div>
         </div>
       )}
-
-      {/* Bottom nav */}
-      <nav
-        aria-label="Main"
-        className="sticky bottom-0 h-[76px] px-3 pb-4 pt-2 bg-white border-t border-line grid grid-cols-4"
-        style={{ bottom: cart && cartItemCount(cart) > 0 ? undefined : 0 }}
-      >
-        <NavItem href="/" label="Home" active icon={
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>
-        } />
-        <NavItem href="/orders" label="Orders" icon={
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/><path d="M9 9h6M9 13h4"/></svg>
-        } />
-        <NavItem href="/wallet" label="Wallet" icon={
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg>
-        } />
-        <NavItem href="/account" label="Account" icon={
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
-        } />
-      </nav>
     </div>
-  )
-}
-
-function NavItem({ href, label, icon, active }: { href: string; label: string; icon: React.ReactNode; active?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`flex flex-col items-center justify-center gap-1 text-xs font-medium no-underline ${
-        active ? 'text-brand font-bold' : 'text-ink-2'
-      }`}
-    >
-      {icon}
-      {label}
-    </Link>
   )
 }
 
