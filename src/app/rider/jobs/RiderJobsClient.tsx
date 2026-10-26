@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Phone } from 'lucide-react'
+import { Phone, Map } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
 import type { Order, OrderItem } from '@/types/database'
@@ -192,16 +192,27 @@ function JobCard({
       {/* Customer */}
       <div className="flex flex-col gap-0.5 p-3 rounded-xl bg-canvas">
         <span className="text-xs font-semibold text-ink-2">Deliver to</span>
-        <span className="text-[15px] font-bold">{job.address_zone}</span>
+        <span className="text-[15px] font-bold">{job.area_name ?? job.address_zone}</span>
         <span className="text-sm text-ink-2">{job.address_landmark}</span>
         {job.address_details && (
           <span className="text-sm text-ink-2">{job.address_details}</span>
         )}
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-3 mt-1">
           <a href={`tel:${job.address_phone}`} className="flex items-center gap-1.5 text-sm text-brand font-semibold">
             <Phone size={14} />
             Call customer
           </a>
+          {(job.area_name ?? job.address_zone) && (
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent((job.area_name ?? job.address_zone) + ', Sagamu, Ogun State')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-brand font-semibold"
+            >
+              <Map size={14} />
+              Open in Maps
+            </a>
+          )}
         </div>
       </div>
 

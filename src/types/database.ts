@@ -25,6 +25,7 @@ export interface Vendor {
   id: string
   owner_id: string | null
   zone_id: string | null
+  area_id: string | null
   name: string
   slug: string
   type: VendorType
@@ -90,18 +91,41 @@ export interface Option {
   sort_order: number
 }
 
+export type AreaStatus = 'active' | 'coming_soon'
+
 export interface Zone {
   id: string
   name: string
   is_active: boolean
 }
 
+export interface Area {
+  id: string
+  zone_id: string | null
+  name: string
+  aliases: string[]
+  lat: number | null
+  lng: number | null
+  status: AreaStatus
+  sort_order: number
+  created_at: string
+}
+
+export interface AreaRequest {
+  id: string
+  area_name: string
+  user_id: string | null
+  email: string | null
+  created_at: string
+}
+
 export interface ZoneFare {
   id: string
-  from_zone: string
-  to_zone: string
+  zone_a: string
+  zone_b: string
   delivery_fee: number
   rider_pay: number
+  is_serviceable: boolean
 }
 
 export interface Rider {
@@ -131,6 +155,7 @@ export interface Address {
   id: string
   user_id: string
   zone_id: string | null
+  area_id: string | null
   label: string | null
   landmark: string
   details: string | null
@@ -144,6 +169,8 @@ export interface Order {
   customer_id: string
   vendor_id: string
   zone_id: string
+  area_id: string | null
+  area_name: string | null
   address_zone: string
   address_landmark: string
   address_details: string | null

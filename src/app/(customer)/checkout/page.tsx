@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
 import { useCart, cartSubtotal } from '@/store/cart'
 import { Button } from '@/components/ui/Button'
-import type { Zone, ZoneFare } from '@/types/database'
+import type { Zone, ZoneFare, Area } from '@/types/database'
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
@@ -17,8 +17,9 @@ export default function CheckoutPage() {
 
   const [zones, setZones] = useState<Zone[]>([])
   const [fares, setFares] = useState<ZoneFare[]>([])
-  const [customerZoneId, setCustomerZoneId] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem('dart_zone_id') ?? '' : '')
+  const [areas, setAreas] = useState<Area[]>([])
+  const [customerAreaId, setCustomerAreaId] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('dart_area_id') ?? '' : '')
   )
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
@@ -36,12 +37,12 @@ export default function CheckoutPage() {
       .select('id, name, is_active')
       .eq('is_active', true)
       .order('name')
-      .then(({ data }) => {
-        if (data) {
-          setZones(data as Zone[])
-          if (data.length > 0) setCustomerZoneId(data[0].id)
-        }
-      })
+      .then(({ data }) => { if (data) setZones(data as Zone[]) })
+    supabase
+      .from('areas')
+      .select('*')
+      .order('sort_order')
+      .then(({ data }) => { if (data) setAreas(data as Area[]) })
     supabase
       .from('zone_fares')
       .select('*')
@@ -59,25 +60,32 @@ export default function CheckoutPage() {
 
   const subtotal = cartSubtotal(cart)
 
-  // Delivery fee from zone_fares (vendor zone → customer zone)
-  // vendorZoneId comes from the vendor; if no fare row exists, delivery_fee = 0
+  // Delivery fee: normalize zone pair from vendor zone + customer zone (via area)
+  const selectedArea = areas.find(a => a.id === customerAreaId)
+  const customerZoneId = selectedArea?.zone_id ?? null
   const vendorZoneId = (cart as { vendorZoneId?: string }).vendorZoneId ?? null
-  const fare = fares.find(f =>
-    f.from_zone === vendorZoneId && f.to_zone === customerZoneId
-  ) ?? fares.find(f => f.to_zone === customerZoneId) ?? null
 
-  const deliveryFee = fare?.delivery_fee ?? 0
-  const riderPay = fare?.rider_pay ?? 0
+  let deliveryFee = 0
+  let riderPay = 0
+  if (customerZoneId && vendorZoneId) {
+    const [pairA, pairB] = [customerZoneId, vendorZoneId].sort()
+    const fare = fares.find(f => f.zone_a === pairA && f.zone_b === pairB) ?? null
+    if (fare) { deliveryFee = fare.delivery_fee; riderPay = fare.rider_pay }
+  }
+
   const serviceFee = 0
   const total = subtotal + deliveryFee + serviceFee
-  const selectedZone = zones.find(z => z.id === customerZoneId)
+
+  // Group areas by zone for the select dropdown
+  const zoneMap = Object.fromEntries(zones.map(z => [z.id, z]))
+  const activeAreas = areas.filter(a => a.status === 'active')
 
   async function placeOrder() {
     if (!user) {
       router.push(`/login?redirect=${encodeURIComponent('/checkout')}`)
       return
     }
-    if (!customerZoneId) { setError('Select your area'); return }
+    if (!customerAreaId) { setError('Select your area'); return }
     if (!landmark.trim()) { setError('Landmark is required'); return }
     if (!phone.trim()) { setError('Enter a phone number for the rider to call'); return }
 
@@ -89,7 +97,7 @@ export default function CheckoutPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         cart,
-        customerZoneId,
+        customerAreaId,
         landmark: landmark.trim(),
         details: details.trim() || null,
         phone: phone.trim(),
@@ -150,16 +158,25 @@ export default function CheckoutPage() {
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Area
             <select
-              value={customerZoneId}
+              value={customerAreaId}
               onChange={e => {
-                setCustomerZoneId(e.target.value)
-                localStorage.setItem('dart_zone_id', e.target.value)
+                setCustomerAreaId(e.target.value)
+                localStorage.setItem('dart_area_id', e.target.value)
               }}
               className="h-btn-sm px-3 rounded-xl border border-line bg-white font-body text-[15px] text-ink font-medium"
             >
-              {zones.map(z => (
-                <option key={z.id} value={z.id}>{z.name}</option>
-              ))}
+              <option value="">Select area…</option>
+              {zones.map(zone => {
+                const zoneAreas = activeAreas.filter(a => a.zone_id === zone.id)
+                if (zoneAreas.length === 0) return null
+                return (
+                  <optgroup key={zone.id} label={zone.name}>
+                    {zoneAreas.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </optgroup>
+                )
+              })}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
@@ -199,8 +216,8 @@ export default function CheckoutPage() {
           <h2 className="text-[15px] font-bold mb-1">Summary</h2>
           <div className="flex justify-between text-sm"><span className="text-ink-2">Food</span><span>{formatMoney(subtotal)}</span></div>
           <div className="flex justify-between text-sm">
-            <span className="text-ink-2">Delivery{selectedZone ? ` · ${selectedZone.name}` : ''}</span>
-            <span>{deliveryFee > 0 ? formatMoney(deliveryFee) : '—'}</span>
+            <span className="text-ink-2">Delivery{selectedArea ? ` · ${selectedArea.name}` : ''}</span>
+            <span>{deliveryFee > 0 ? formatMoney(deliveryFee) : customerZoneId ? 'Free' : '—'}</span>
           </div>
           <div className="flex justify-between text-sm"><span className="text-ink-2">Service fee</span><span>{serviceFee > 0 ? formatMoney(serviceFee) : '—'}</span></div>
           <div className="h-px bg-line my-1" />

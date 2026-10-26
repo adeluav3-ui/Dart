@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck, Check, X } from 'lucide-react'
+import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck } from 'lucide-react'
 import { DartLogo } from '@/components/ui/DartLogo'
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
+import { AreaPicker } from '@/components/AreaPicker'
 import { formatMoney } from '@/lib/format'
 import { useCart, cartItemCount, cartSubtotal } from '@/store/cart'
-import type { Vendor, Zone, VendorType } from '@/types/database'
+import type { Vendor, Zone, Area, ZoneFare, VendorType } from '@/types/database'
 
-const ZONE_KEY = 'dart_zone_id'
+const AREA_KEY = 'dart_area_id'
 
 const STORE_TYPES: { label: string; value: VendorType | 'all' }[] = [
   { label: 'Food', value: 'restaurant' },
@@ -23,35 +24,46 @@ const FOOD_CATEGORIES = ['All', 'Rice', 'Swallow', 'Grills', 'Snacks', 'Drinks']
 interface Props {
   vendors: Vendor[]
   zones: Zone[]
+  areas: Area[]
+  zoneFares: ZoneFare[]
 }
 
-export function HomeClient({ vendors, zones }: Props) {
+export function HomeClient({ vendors, zones, areas, zoneFares }: Props) {
   const [storeType, setStoreType] = useState<VendorType | 'all'>('restaurant')
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
-  const [zoneId, setZoneId] = useState<string>('')
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [areaId, setAreaId] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const { cart } = useCart()
   const itemCount = cart ? cartItemCount(cart) : 0
-  const sheetRef = useRef<HTMLDivElement>(null)
 
-  // Hydrate selected zone from localStorage
+  // Hydrate area from localStorage; open picker if none selected
   useEffect(() => {
-    const saved = localStorage.getItem(ZONE_KEY)
-    if (saved && zones.some(z => z.id === saved)) {
-      setZoneId(saved)
-    } else if (zones.length > 0) {
-      setZoneId(zones[0].id)
+    const saved = localStorage.getItem(AREA_KEY)
+    if (saved && areas.some(a => a.id === saved && a.status === 'active')) {
+      setAreaId(saved)
+    } else if (areas.length > 0) {
+      setPickerOpen(true)
     }
-  }, [zones])
+  }, [areas])
 
-  function selectZone(id: string) {
-    setZoneId(id)
-    localStorage.setItem(ZONE_KEY, id)
-    setSheetOpen(false)
+  function saveArea(id: string) {
+    setAreaId(id)
+    localStorage.setItem(AREA_KEY, id)
+    setPickerOpen(false)
   }
 
-  const selectedZone = zones.find(z => z.id === zoneId)
+  const selectedArea = areas.find(a => a.id === areaId)
+  const customerZoneId = selectedArea?.zone_id ?? null
+
+  // Compute delivery fee for a vendor given the current customer zone
+  function deliveryFeeForVendor(vendor: Vendor): number | null {
+    if (!customerZoneId || !vendor.zone_id) return null
+    const [pairA, pairB] = [customerZoneId, vendor.zone_id].sort()
+    const fare = zoneFares.find(f => f.zone_a === pairA && f.zone_b === pairB)
+    if (!fare) return null
+    return fare.delivery_fee
+  }
 
   const filtered = useMemo(() => {
     return vendors.filter(v => {
@@ -93,7 +105,7 @@ export function HomeClient({ vendors, zones }: Props) {
         <div className="px-4 pt-2 pb-3">
           <button
             type="button"
-            onClick={() => setSheetOpen(true)}
+            onClick={() => setPickerOpen(true)}
             className="flex items-center gap-2.5 min-h-[44px] text-left"
           >
             <span className="w-8 h-8 rounded-full bg-brand-tint flex items-center justify-center flex-none">
@@ -102,7 +114,7 @@ export function HomeClient({ vendors, zones }: Props) {
             <span className="flex flex-col">
               <span className="text-[11px] text-ink-2">Deliver to</span>
               <span className="text-[14px] font-bold flex items-center gap-1">
-                {selectedZone?.name ?? 'Select area'}
+                {selectedArea?.name ?? 'Select area'}
                 <ChevronDown size={13} strokeWidth={2.2} />
               </span>
             </span>
@@ -180,7 +192,9 @@ export function HomeClient({ vendors, zones }: Props) {
             <>
               <h2 className="font-heading font-bold text-[16px] mt-1">Open now</h2>
               <div className="flex flex-col gap-3.5">
-                {open.map(v => <VendorCard key={v.id} vendor={v} />)}
+                {open.map(v => (
+                  <VendorCard key={v.id} vendor={v} deliveryFee={deliveryFeeForVendor(v)} />
+                ))}
               </div>
             </>
           )}
@@ -189,7 +203,9 @@ export function HomeClient({ vendors, zones }: Props) {
             <>
               <h2 className="font-heading font-bold text-[16px] mt-1 text-ink-2">Closed</h2>
               <div className="flex flex-col gap-3.5 opacity-60">
-                {closed.map(v => <VendorCard key={v.id} vendor={v} />)}
+                {closed.map(v => (
+                  <VendorCard key={v.id} vendor={v} deliveryFee={deliveryFeeForVendor(v)} />
+                ))}
               </div>
             </>
           )}
@@ -199,7 +215,7 @@ export function HomeClient({ vendors, zones }: Props) {
           )}
         </div>
 
-        {/* Cart bar — fixed, sits above bottom nav */}
+        {/* Cart bar */}
         {itemCount > 0 && (
           <div
             className="fixed inset-x-0 px-4 z-40"
@@ -223,54 +239,21 @@ export function HomeClient({ vendors, zones }: Props) {
         )}
       </div>
 
-      {/* Zone picker bottom sheet */}
-      {sheetOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/40 z-50"
-            onClick={() => setSheetOpen(false)}
-          />
-          {/* Sheet */}
-          <div
-            ref={sheetRef}
-            className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl max-w-md mx-auto"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <span className="font-heading font-bold text-[17px]">Choose your area</span>
-              <button
-                type="button"
-                onClick={() => setSheetOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-surface"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="px-4 pb-4 flex flex-col gap-1 max-h-[60dvh] overflow-y-auto">
-              {zones.map(z => (
-                <button
-                  key={z.id}
-                  type="button"
-                  onClick={() => selectZone(z.id)}
-                  className="flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-left transition-colors hover:bg-surface active:bg-surface"
-                >
-                  <span className="text-[15px] font-medium text-ink">{z.name}</span>
-                  {z.id === zoneId && <Check size={18} stroke="#0B7A47" strokeWidth={2.5} />}
-                </button>
-              ))}
-              {zones.length === 0 && (
-                <p className="text-sm text-ink-2 text-center py-6">No areas available yet</p>
-              )}
-            </div>
-          </div>
-        </>
+      {/* Area picker */}
+      {pickerOpen && (
+        <AreaPicker
+          areas={areas}
+          zones={zones}
+          selectedId={areaId}
+          onSave={saveArea}
+          onClose={areaId ? () => setPickerOpen(false) : undefined}
+        />
       )}
     </>
   )
 }
 
-function VendorCard({ vendor }: { vendor: Vendor }) {
+function VendorCard({ vendor, deliveryFee }: { vendor: Vendor; deliveryFee: number | null }) {
   const showRating = vendor.rating_count >= 5
 
   return (
@@ -312,6 +295,11 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
             </span>
           ) : (
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface text-ink-2">New</span>
+          )}
+          {deliveryFee != null && (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-tint text-brand-ink">
+              {deliveryFee === 0 ? 'Free delivery' : `${formatMoney(deliveryFee)} delivery`}
+            </span>
           )}
         </div>
       </div>

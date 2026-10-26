@@ -35,46 +35,69 @@ export default function AdminZonesPage() {
     setZones(prev => prev.map(z => z.id === zone.id ? { ...z, is_active: !z.is_active } : z))
   }
 
-  function fareKey(from: string, to: string) { return `${from}__${to}` }
-
-  function getFare(from: string, to: string): ZoneFare | undefined {
-    return fares.find(f => f.from_zone === from && f.to_zone === to)
+  // Canonical pair key: smaller zone_id first
+  function pairKey(a: string, b: string) {
+    const [za, zb] = [a, b].sort()
+    return `${za}__${zb}`
   }
 
-  function getEdit(from: string, to: string) {
-    const key = fareKey(from, to)
+  function getFare(a: string, b: string): ZoneFare | undefined {
+    const [za, zb] = [a, b].sort()
+    return fares.find(f => f.zone_a === za && f.zone_b === zb)
+  }
+
+  function getEdit(a: string, b: string) {
+    const key = pairKey(a, b)
     if (fareEdit[key]) return fareEdit[key]
-    const existing = getFare(from, to)
+    const existing = getFare(a, b)
     return {
       delivery_fee: existing ? String(existing.delivery_fee / 100) : '',
       rider_pay: existing ? String(existing.rider_pay / 100) : '',
     }
   }
 
-  function setEdit(from: string, to: string, field: 'delivery_fee' | 'rider_pay', val: string) {
-    const key = fareKey(from, to)
-    setFareEdit(p => ({ ...p, [key]: { ...getEdit(from, to), [field]: val } }))
+  function setEdit(a: string, b: string, field: 'delivery_fee' | 'rider_pay', val: string) {
+    const key = pairKey(a, b)
+    setFareEdit(p => ({ ...p, [key]: { ...getEdit(a, b), [field]: val } }))
   }
 
-  async function saveFare(from: string, to: string) {
-    const edit = getEdit(from, to)
+  async function saveFare(a: string, b: string) {
+    const edit = getEdit(a, b)
     const delivery_fee = Math.round(parseFloat(edit.delivery_fee || '0') * 100)
     const rider_pay = Math.round(parseFloat(edit.rider_pay || '0') * 100)
+    const [zone_a, zone_b] = [a, b].sort()
 
-    const existing = getFare(from, to)
+    const existing = getFare(a, b)
     if (existing) {
       await supabase.from('zone_fares').update({ delivery_fee, rider_pay }).eq('id', existing.id)
       setFares(p => p.map(f => f.id === existing.id ? { ...f, delivery_fee, rider_pay } : f))
     } else {
-      const { data } = await supabase.from('zone_fares').insert({ from_zone: from, to_zone: to, delivery_fee, rider_pay }).select().single()
+      const { data } = await supabase.from('zone_fares').insert({ zone_a, zone_b, delivery_fee, rider_pay }).select().single()
       if (data) setFares(p => [...p, data as ZoneFare])
     }
 
-    const key = fareKey(from, to)
+    const key = pairKey(a, b)
     setFareEdit(p => { const n = { ...p }; delete n[key]; return n })
   }
 
+  async function toggleServiceable(a: string, b: string) {
+    const existing = getFare(a, b)
+    if (!existing) return
+    const next = !existing.is_serviceable
+    await supabase.from('zone_fares').update({ is_serviceable: next }).eq('id', existing.id)
+    setFares(p => p.map(f => f.id === existing.id ? { ...f, is_serviceable: next } : f))
+  }
+
   const activeZones = zones.filter(z => z.is_active)
+
+  // Build unique unordered pairs (including same-zone)
+  type Pair = { a: Zone; b: Zone; same: boolean }
+  const pairs: Pair[] = []
+  for (let i = 0; i < activeZones.length; i++) {
+    for (let j = i; j < activeZones.length; j++) {
+      pairs.push({ a: activeZones[i], b: activeZones[j], same: i === j })
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
@@ -87,7 +110,7 @@ export default function AdminZonesPage() {
           <div className="flex-1">
             <Input
               label=""
-              placeholder="Zone name (e.g. OOUTH and hospital road)"
+              placeholder="Zone name (e.g. Central)"
               value={zoneName}
               onChange={e => setZoneName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addZone()}
@@ -116,64 +139,79 @@ export default function AdminZonesPage() {
         ))}
       </div>
 
-      {/* Zone fares matrix */}
-      {activeZones.length >= 2 && (
+      {/* Zone fares grid */}
+      {activeZones.length >= 1 && (
         <div className="bg-white rounded-2xl p-4 flex flex-col gap-4">
-          <h3 className="font-bold text-sm">Delivery fares (from vendor zone → customer zone)</h3>
-          <p className="text-xs text-ink-2">Each row is a vendor&apos;s zone; each column is the customer&apos;s zone. Set delivery fee and rider pay per pair.</p>
-          {activeZones.map(fromZone => (
-            <div key={fromZone.id} className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-ink-2 uppercase tracking-wide">From: {fromZone.name}</span>
-              {activeZones.filter(z => z.id !== fromZone.id).map(toZone => {
-                const edit = getEdit(fromZone.id, toZone.id)
-                const existing = getFare(fromZone.id, toZone.id)
-                const key = fareKey(fromZone.id, toZone.id)
-                const isDirty = !!fareEdit[key]
-                return (
-                  <div key={toZone.id} className="flex items-end gap-2 py-2 border-b border-line last:border-0">
-                    <span className="text-sm font-semibold w-32 shrink-0">To: {toZone.name}</span>
-                    <div className="flex gap-2 flex-1">
-                      <label className="flex flex-col gap-0.5 flex-1">
-                        <span className="text-[11px] text-ink-2">Delivery (₦)</span>
-                        <input
-                          type="number"
-                          step="50"
-                          value={edit.delivery_fee}
-                          onChange={e => setEdit(fromZone.id, toZone.id, 'delivery_fee', e.target.value)}
-                          placeholder="0"
-                          className="h-9 px-2 rounded-lg border border-line text-sm font-body"
-                        />
-                      </label>
-                      <label className="flex flex-col gap-0.5 flex-1">
-                        <span className="text-[11px] text-ink-2">Rider pay (₦)</span>
-                        <input
-                          type="number"
-                          step="50"
-                          value={edit.rider_pay}
-                          onChange={e => setEdit(fromZone.id, toZone.id, 'rider_pay', e.target.value)}
-                          placeholder="0"
-                          className="h-9 px-2 rounded-lg border border-line text-sm font-body"
-                        />
-                      </label>
-                    </div>
+          <div>
+            <h3 className="font-bold text-sm">Delivery fares</h3>
+            <p className="text-xs text-ink-2 mt-0.5">
+              One row per zone pair (including same-zone delivery). Toggle &ldquo;Serve&rdquo; to enable ordering between zones.
+            </p>
+          </div>
+          {pairs.map(({ a, b, same }) => {
+            const edit = getEdit(a.id, b.id)
+            const existing = getFare(a.id, b.id)
+            const key = pairKey(a.id, b.id)
+            const isDirty = !!fareEdit[key]
+            return (
+              <div key={key} className="flex flex-col gap-1.5 py-3 border-b border-line last:border-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">
+                    {same ? `${a.name} → ${a.name}` : `${a.name} ↔ ${b.name}`}
+                  </span>
+                  {existing && (
                     <button
                       type="button"
-                      onClick={() => saveFare(fromZone.id, toZone.id)}
-                      disabled={!isDirty && !(!existing && edit.delivery_fee)}
-                      className="h-9 px-3 rounded-lg bg-brand text-white text-sm font-bold border-0 disabled:opacity-40"
+                      role="switch"
+                      aria-checked={existing.is_serviceable}
+                      onClick={() => toggleServiceable(a.id, b.id)}
+                      className={`relative w-9 h-5 rounded-full border-0 cursor-pointer transition-colors flex-none ${existing.is_serviceable ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
                     >
-                      {existing ? 'Update' : 'Set'}
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${existing.is_serviceable ? 'left-4' : 'left-0.5'}`} />
                     </button>
-                    {existing && !isDirty && (
-                      <span className="text-xs text-ink-2 whitespace-nowrap">
-                        {formatMoney(existing.delivery_fee)} / {formatMoney(existing.rider_pay)}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ))}
+                  )}
+                </div>
+                <div className="flex items-end gap-2">
+                  <label className="flex flex-col gap-0.5 flex-1">
+                    <span className="text-[11px] text-ink-2">Delivery (₦)</span>
+                    <input
+                      type="number"
+                      step="50"
+                      value={edit.delivery_fee}
+                      onChange={e => setEdit(a.id, b.id, 'delivery_fee', e.target.value)}
+                      placeholder="0"
+                      className="h-9 px-2 rounded-lg border border-line text-sm font-body"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5 flex-1">
+                    <span className="text-[11px] text-ink-2">Rider pay (₦)</span>
+                    <input
+                      type="number"
+                      step="50"
+                      value={edit.rider_pay}
+                      onChange={e => setEdit(a.id, b.id, 'rider_pay', e.target.value)}
+                      placeholder="0"
+                      className="h-9 px-2 rounded-lg border border-line text-sm font-body"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => saveFare(a.id, b.id)}
+                    disabled={!isDirty && !!existing}
+                    className="h-9 px-3 rounded-lg bg-brand text-white text-sm font-bold border-0 disabled:opacity-40 shrink-0"
+                  >
+                    {existing ? 'Update' : 'Set'}
+                  </button>
+                </div>
+                {existing && !isDirty && (
+                  <span className="text-xs text-ink-2">
+                    {formatMoney(existing.delivery_fee)} delivery · {formatMoney(existing.rider_pay)} rider pay
+                    {!existing.is_serviceable && <span className="ml-2 text-warn font-semibold">· Not serving</span>}
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

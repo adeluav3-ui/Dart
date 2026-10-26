@@ -1,11 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { HomeClient } from '../HomeClient'
-import type { Vendor, Zone } from '@/types/database'
+import type { Vendor, Zone, Area, ZoneFare } from '@/types/database'
 
 export default async function HomePage() {
   const supabase = createClient()
 
-  const [{ data: vendors }, { data: zones }] = await Promise.all([
+  const [
+    { data: vendors },
+    { data: zones },
+    { data: areas },
+    { data: zoneFares },
+  ] = await Promise.all([
     supabase
       .from('vendors')
       .select('*')
@@ -13,12 +18,16 @@ export default async function HomePage() {
       .order('is_open', { ascending: false })
       .order('rating_avg', { ascending: false }),
     supabase.from('zones').select('*').eq('is_active', true).order('name'),
+    supabase.from('areas').select('*').order('sort_order'),
+    supabase.from('zone_fares').select('*'),
   ])
 
   return (
     <HomeClient
       vendors={(vendors as Vendor[]) ?? []}
       zones={(zones as Zone[]) ?? []}
+      areas={(areas as Area[]) ?? []}
+      zoneFares={(zoneFares as ZoneFare[]) ?? []}
     />
   )
 }

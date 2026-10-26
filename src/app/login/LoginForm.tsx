@@ -79,9 +79,8 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
           onChange={e => handleChange(i, e)}
           onKeyDown={e => handleKey(i, e)}
           onClick={() => focus(i)}
-          className={`flex-1 aspect-square rounded-2xl border-2 text-center text-xl font-bold font-body text-ink bg-white outline-none transition-colors focus:border-brand ${
-            value[i] ? 'border-brand' : 'border-line'
-          }`}
+          className={`flex-1 aspect-square rounded-2xl border-2 text-center text-xl font-bold font-body text-ink bg-white outline-none transition-colors focus:border-brand ${value[i] ? 'border-brand' : 'border-line'
+            }`}
           aria-label={`Digit ${i + 1}`}
         />
       ))}
@@ -117,7 +116,7 @@ export function LoginForm() {
     if (otp.replace(/\D/g, '').length === 6) {
       verifyCode()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp])
 
   function startResendTimer() {
@@ -181,7 +180,7 @@ export function LoginForm() {
       router.replace(next === '/home' ? roleHome(profile.role) : next)
       router.refresh()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp, email, next])
 
   async function saveProfile() {
@@ -320,10 +319,6 @@ export function LoginForm() {
               Continue with email
             </Button>
           </div>
-
-          <p className="text-center text-[13px] text-ink-2 mt-auto">
-            Vendor or rider? Sign in the same way and we&apos;ll open your dashboard.
-          </p>
         </div>
       </div>
     )

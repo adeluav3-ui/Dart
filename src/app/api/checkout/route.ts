@@ -14,9 +14,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { cart, customerZoneId, landmark, details, phone }: {
+    const { cart, customerAreaId, landmark, details, phone }: {
       cart: Cart
-      customerZoneId: string
+      customerAreaId: string
       landmark: string
       details: string | null
       phone: string
@@ -26,7 +26,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     }
 
-    // 1. Load customer zone
+    // 1. Load customer area → zone
+    const { data: customerArea, error: areaErr } = await admin
+      .from('areas')
+      .select('id, name, zone_id, status')
+      .eq('id', customerAreaId)
+      .eq('status', 'active')
+      .single()
+
+    if (areaErr || !customerArea || !customerArea.zone_id) {
+      return NextResponse.json({ error: 'Area not found or not yet serviceable' }, { status: 400 })
+    }
+
+    const customerZoneId = customerArea.zone_id
+
     const { data: customerZone, error: zoneErr } = await admin
       .from('zones')
       .select('id, name, is_active')
@@ -115,16 +128,17 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4. Look up delivery fee from zone_fares (vendor zone → customer zone)
+    // 4. Look up delivery fee from zone_fares using canonical unordered pair
     let deliveryFee = 0
     let riderPay = 0
 
     if (vendor.zone_id) {
+      const [pairA, pairB] = [vendor.zone_id, customerZoneId].sort()
       const { data: fare } = await admin
         .from('zone_fares')
-        .select('delivery_fee, rider_pay')
-        .eq('from_zone', vendor.zone_id)
-        .eq('to_zone', customerZoneId)
+        .select('delivery_fee, rider_pay, is_serviceable')
+        .eq('zone_a', pairA)
+        .eq('zone_b', pairB)
         .maybeSingle()
 
       if (fare) {
@@ -147,6 +161,8 @@ export async function POST(req: NextRequest) {
         customer_id: user.id,
         vendor_id: vendor.id,
         zone_id: customerZoneId,
+        area_id: customerArea.id,
+        area_name: customerArea.name,
         address_zone: customerZone.name,
         address_landmark: landmark,
         address_details: details,
