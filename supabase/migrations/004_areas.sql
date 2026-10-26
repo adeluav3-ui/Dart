@@ -137,12 +137,12 @@ create policy "Admin manages zone fares"
 -- areas use ON CONFLICT on the lower(name) expression index.
 -- ============================================================
 
-insert into zones (name, is_active)
-select 'Central', true
+insert into zones (name, is_active, delivery_fee, rider_pay)
+select 'Central', true, 0, 0
 where not exists (select 1 from zones where name = 'Central');
 
-insert into zones (name, is_active)
-select 'North', true
+insert into zones (name, is_active, delivery_fee, rider_pay)
+select 'North', true, 0, 0
 where not exists (select 1 from zones where name = 'North');
 
 do $$
