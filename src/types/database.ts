@@ -254,6 +254,42 @@ export interface Review {
   created_at: string
 }
 
+export type PayoutRequestStatus = 'pending' | 'approved' | 'rejected'
+
+export interface PayoutRequest {
+  id: string
+  user_id: string
+  amount: number
+  bank_name: string
+  account_no: string
+  account_name: string
+  status: PayoutRequestStatus
+  note: string | null
+  created_at: string
+}
+
+export interface VendorApplication {
+  id: string
+  user_id: string
+  business_name: string
+  business_type: VendorType
+  area: string
+  phone: string
+  status: string
+  created_at: string
+}
+
+export interface RiderApplication {
+  id: string
+  user_id: string
+  full_name: string
+  phone: string
+  area: string
+  has_bike: boolean
+  status: string
+  created_at: string
+}
+
 // Cart types (client-only)
 export interface CartItem {
   item: MenuItem
