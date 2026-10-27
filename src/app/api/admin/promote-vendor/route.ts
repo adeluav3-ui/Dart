@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
   })
   if (vendorErr) return NextResponse.json({ error: vendorErr.message }, { status: 500 })
 
-  const { error: roleErr } = await admin.from('profiles').update({ role: 'vendor' }).eq('id', userId)
+  const { error: roleErr } = await admin.from('profiles')
+    .upsert({ id: userId, role: 'vendor' }, { onConflict: 'id' })
   if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })

@@ -19,12 +19,17 @@ export default async function AdminUsersPage() {
     supabase.from('zones').select('id, name').eq('is_active', true).order('name'),
   ])
 
-  const emailMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u.email ?? '']))
+  const profileMap = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
 
-  const users = (profilesData ?? []).map(p => ({
-    ...p,
-    email: emailMap[p.id] ?? '',
-  }))
+  // Auth users are the source of truth — profiles may be missing for early signups
+  const users = (authUsers ?? []).map(u => ({
+    id: u.id,
+    email: u.email ?? '',
+    full_name: profileMap[u.id]?.full_name ?? null,
+    phone: profileMap[u.id]?.phone ?? null,
+    role: (profileMap[u.id]?.role ?? 'customer') as import('@/types/database').UserRole,
+    created_at: u.created_at,
+  })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <UsersClient

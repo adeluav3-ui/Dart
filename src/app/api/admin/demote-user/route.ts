@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { error } = await admin.from('profiles').update({ role: 'customer' }).eq('id', userId)
+  const { error } = await admin.from('profiles')
+    .upsert({ id: userId, role: 'customer' }, { onConflict: 'id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
