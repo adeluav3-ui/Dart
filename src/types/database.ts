@@ -107,6 +107,7 @@ export interface Area {
   aliases: string[]
   lat: number | null
   lng: number | null
+  gate_pickup: boolean
   status: AreaStatus
   sort_order: number
   created_at: string
@@ -120,12 +121,20 @@ export interface AreaRequest {
   created_at: string
 }
 
+export interface FareLevel {
+  id: string
+  name: string
+  okada_price: number
+  rider_pay: number
+  delivery_fee: number
+  sort_order: number
+}
+
 export interface ZoneFare {
   id: string
   zone_a: string
   zone_b: string
-  delivery_fee: number
-  rider_pay: number
+  fare_level_id: string | null
   is_serviceable: boolean
 }
 
@@ -192,6 +201,10 @@ export interface Order {
   ready_at: string | null
   picked_up_at: string | null
   delivered_at: string | null
+  is_gate_pickup: boolean
+  gate_arrived_at: string | null
+  gate_no_show: boolean
+  gate_no_show_at: string | null
 }
 
 export interface OrderItem {

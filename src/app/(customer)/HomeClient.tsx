@@ -9,7 +9,7 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
 import { AreaPicker } from '@/components/AreaPicker'
 import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartItemCount, cartSubtotal } from '@/store/cart'
-import type { Vendor, Zone, Area, ZoneFare, VendorType } from '@/types/database'
+import type { Vendor, Zone, Area, ZoneFare, FareLevel, VendorType } from '@/types/database'
 
 const areaKey = (userId: string | null) => `dart_area_${userId ?? 'guest'}`
 
@@ -27,9 +27,10 @@ interface Props {
   zones: Zone[]
   areas: Area[]
   zoneFares: ZoneFare[]
+  fareLevels: FareLevel[]
 }
 
-export function HomeClient({ userId, vendors, zones, areas, zoneFares }: Props) {
+export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevels }: Props) {
   const [storeType, setStoreType] = useState<VendorType | 'all'>('restaurant')
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
@@ -62,8 +63,8 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares }: Props) 
     if (!customerZoneId || !vendor.zone_id) return null
     const [pairA, pairB] = [customerZoneId, vendor.zone_id].sort()
     const fare = zoneFares.find(f => f.zone_a === pairA && f.zone_b === pairB)
-    if (!fare) return null
-    return fare.delivery_fee
+    if (!fare?.fare_level_id) return null
+    return fareLevels.find(l => l.id === fare.fare_level_id)?.delivery_fee ?? null
   }
 
   const filtered = useMemo(() => {

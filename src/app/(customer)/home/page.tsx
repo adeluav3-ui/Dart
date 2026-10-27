@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const revalidate = 60
 import { HomeClient } from '../HomeClient'
-import type { Vendor, Zone, Area, ZoneFare } from '@/types/database'
+import type { Vendor, Zone, Area, ZoneFare, FareLevel } from '@/types/database'
 
 export default async function HomePage() {
   const supabase = createClient()
@@ -13,6 +13,7 @@ export default async function HomePage() {
     { data: zones },
     { data: areas },
     { data: zoneFares },
+    { data: fareLevels },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -24,6 +25,7 @@ export default async function HomePage() {
     supabase.from('zones').select('*').eq('is_active', true).order('name'),
     supabase.from('areas').select('*').order('status').order('sort_order'),
     supabase.from('zone_fares').select('*'),
+    supabase.from('fare_levels').select('*').order('sort_order'),
   ])
 
   return (
@@ -33,6 +35,7 @@ export default async function HomePage() {
       zones={(zones as Zone[]) ?? []}
       areas={(areas as Area[]) ?? []}
       zoneFares={(zoneFares as ZoneFare[]) ?? []}
+      fareLevels={(fareLevels as FareLevel[]) ?? []}
     />
   )
 }

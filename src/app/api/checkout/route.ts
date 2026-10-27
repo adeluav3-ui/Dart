@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     // 1. Load customer area → zone
     const { data: customerArea, error: areaErr } = await admin
       .from('areas')
-      .select('id, name, zone_id, status')
+      .select('id, name, zone_id, status, gate_pickup')
       .eq('id', customerAreaId)
       .eq('status', 'active')
       .single()
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4. Look up delivery fee from zone_fares using canonical unordered pair
+    // 4. Look up delivery fee via fare level
     let deliveryFee = 0
     let riderPay = 0
 
@@ -136,14 +136,14 @@ export async function POST(req: NextRequest) {
       const [pairA, pairB] = [vendor.zone_id, customerZoneId].sort()
       const { data: fare } = await admin
         .from('zone_fares')
-        .select('delivery_fee, rider_pay, is_serviceable')
+        .select('fare_level_id, is_serviceable, fare_levels(rider_pay, delivery_fee)')
         .eq('zone_a', pairA)
         .eq('zone_b', pairB)
         .maybeSingle()
 
-      if (fare) {
-        deliveryFee = fare.delivery_fee
-        riderPay = fare.rider_pay
+      if (fare?.fare_levels) {
+        const level = (Array.isArray(fare.fare_levels) ? fare.fare_levels[0] : fare.fare_levels) as { rider_pay: number; delivery_fee: number }
+        if (level) { deliveryFee = level.delivery_fee; riderPay = level.rider_pay }
       }
     }
 
@@ -163,6 +163,7 @@ export async function POST(req: NextRequest) {
         zone_id: customerZoneId,
         area_id: customerArea.id,
         area_name: customerArea.name,
+        is_gate_pickup: customerArea.gate_pickup ?? false,
         address_zone: customerZone.name,
         address_landmark: landmark,
         address_details: details,

@@ -8,16 +8,17 @@ import { createClient } from '@/lib/supabase/client'
 import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartSubtotal } from '@/store/cart'
 import { Button } from '@/components/ui/Button'
-import type { Zone, ZoneFare, Area } from '@/types/database'
+import type { Zone, ZoneFare, Area, FareLevel } from '@/types/database'
 
 interface Props {
   userId: string | null
   zones: Zone[]
   areas: Area[]
   fares: ZoneFare[]
+  fareLevels: FareLevel[]
 }
 
-export function CheckoutClient({ userId, zones, areas, fares }: Props) {
+export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
@@ -46,13 +47,17 @@ export function CheckoutClient({ userId, zones, areas, fares }: Props) {
   const selectedArea = areas.find(a => a.id === customerAreaId)
   const customerZoneId = selectedArea?.zone_id ?? null
   const vendorZoneId = (cart as any).vendorZoneId ?? null
+  const isGatePickup = selectedArea?.gate_pickup ?? false
 
   let deliveryFee = 0
   let riderPay = 0
   if (customerZoneId && vendorZoneId) {
     const [pairA, pairB] = [customerZoneId, vendorZoneId].sort()
     const fare = fares.find(f => f.zone_a === pairA && f.zone_b === pairB) ?? null
-    if (fare) { deliveryFee = fare.delivery_fee; riderPay = fare.rider_pay }
+    if (fare?.fare_level_id) {
+      const level = fareLevels.find(l => l.id === fare.fare_level_id)
+      if (level) { deliveryFee = level.delivery_fee; riderPay = level.rider_pay }
+    }
   }
 
   const serviceFee = 0
@@ -66,7 +71,7 @@ export function CheckoutClient({ userId, zones, areas, fares }: Props) {
       return
     }
     if (!customerAreaId) { setError('Select your area'); return }
-    if (!landmark.trim()) { setError('Landmark is required'); return }
+    if (!isGatePickup && !landmark.trim()) { setError('Landmark is required'); return }
     if (!phone.trim()) { setError('Enter a phone number for the rider to call'); return }
 
     setLoading(true)
@@ -152,13 +157,18 @@ export function CheckoutClient({ userId, zones, areas, fares }: Props) {
               })}
             </select>
           </label>
+          {isGatePickup && (
+            <div className="px-3 py-2.5 rounded-xl bg-brand-tint border border-brand/20 text-[13px] text-brand-ink leading-relaxed">
+              Your rider will wait at <span className="font-semibold">{selectedArea?.name}</span>. Please come out to collect your order.
+            </div>
+          )}
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-            Landmark (required)
+            {isGatePickup ? 'Landmark (optional)' : 'Landmark (required)'}
             <input
               type="text"
               value={landmark}
               onChange={e => setLandmark(e.target.value)}
-              placeholder="e.g. OOUTH main gate, beside pharmacy"
+              placeholder={isGatePickup ? 'e.g. beside pharmacy kiosk' : 'e.g. brown gate, beside pharmacy'}
               className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
             />
           </label>
