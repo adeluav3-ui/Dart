@@ -9,11 +9,12 @@ export default async function VendorLayout({ children }: { children: React.React
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('roles')
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'vendor' && profile.role !== 'admin')) {
+  const roles: string[] = profile?.roles ?? []
+  if (!roles.includes('vendor') && !roles.includes('admin')) {
     redirect('/')
   }
 

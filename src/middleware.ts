@@ -37,17 +37,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Skip the complete-profile page itself to avoid infinite loops
+  const isCompleteProfile = pathname === '/complete-profile'
+
   // ── Logged-in user hitting /login or /welcome → send to role home ──────────
   if (user && (pathname === '/login' || pathname === '/welcome')) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('roles, last_dashboard, full_name, phone')
       .eq('id', user.id)
       .single()
-    const role = profile?.role
-    if (role === 'vendor') return redirectTo('/vendor')
-    if (role === 'rider')  return redirectTo('/rider')
-    if (role === 'admin')  return redirectTo('/admin')
+
+    if (!profile?.full_name || !profile?.phone) {
+      return redirectTo('/complete-profile')
+    }
+
+    const roles: string[] = profile?.roles ?? ['customer']
+    const lastDash = profile?.last_dashboard
+
+    // Use last_dashboard if they have multiple non-customer roles
+    if (lastDash && roles.includes(lastDash.replace('/', ''))) {
+      return redirectTo(lastDash)
+    }
+    if (roles.includes('admin'))  return redirectTo('/admin')
+    if (roles.includes('vendor')) return redirectTo('/vendor')
+    if (roles.includes('rider'))  return redirectTo('/rider')
     return redirectTo('/home')
   }
 
@@ -57,12 +71,30 @@ export async function middleware(request: NextRequest) {
     return loginRedirect()
   }
 
+  // ── Complete-profile gate ─────────────────────────────────────────────────
+  const PROFILE_GATED = ['/checkout', '/orders', '/account']
+  if (user && !isCompleteProfile && PROFILE_GATED.some(p => pathname.startsWith(p))) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.full_name || !profile?.phone) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/complete-profile'
+      url.searchParams.set('next', pathname)
+      return NextResponse.redirect(url)
+    }
+  }
+
   // ── Role-protected routes ─────────────────────────────────────────────────
   const isVendorDash =
     pathname === '/vendor' ||
     pathname.startsWith('/vendor/orders') ||
     pathname.startsWith('/vendor/menu') ||
-    pathname.startsWith('/vendor/earnings')
+    pathname.startsWith('/vendor/earnings') ||
+    pathname.startsWith('/vendor/shop')
 
   const isRiderDash = pathname === '/rider' || pathname.startsWith('/rider/')
   const isAdminDash = pathname === '/admin' || pathname.startsWith('/admin/')
@@ -72,19 +104,23 @@ export async function middleware(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('roles')
       .eq('id', user.id)
       .single()
-    const role = profile?.role
+    const roles: string[] = profile?.roles ?? []
 
-    if (isAdminDash && role !== 'admin') {
-      return redirectTo(role === 'vendor' ? '/vendor' : role === 'rider' ? '/rider' : '/home')
+    if (isAdminDash && !roles.includes('admin')) {
+      if (roles.includes('vendor')) return redirectTo('/vendor')
+      if (roles.includes('rider'))  return redirectTo('/rider')
+      return redirectTo('/home')
     }
-    if (isVendorDash && role !== 'vendor' && role !== 'admin') {
-      return redirectTo(role === 'rider' ? '/rider' : '/home')
+    if (isVendorDash && !roles.includes('vendor') && !roles.includes('admin')) {
+      if (roles.includes('rider')) return redirectTo('/rider')
+      return redirectTo('/home')
     }
-    if (isRiderDash && role !== 'rider' && role !== 'admin') {
-      return redirectTo(role === 'vendor' ? '/vendor' : '/home')
+    if (isRiderDash && !roles.includes('rider') && !roles.includes('admin')) {
+      if (roles.includes('vendor')) return redirectTo('/vendor')
+      return redirectTo('/home')
     }
   }
 

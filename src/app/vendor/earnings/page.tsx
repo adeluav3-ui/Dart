@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/format'
-import Link from 'next/link'
+import { VendorNav } from '@/components/vendor/VendorNav'
 
 export default async function VendorEarningsPage() {
   const supabase = createClient()
@@ -75,20 +75,7 @@ export default async function VendorEarningsPage() {
         ))}
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 h-[72px] px-3 pb-3.5 pt-2 bg-white border-t border-line grid grid-cols-3">
-        <Link href="/vendor/orders" className="flex flex-col items-center justify-center gap-1 text-xs font-medium text-ink-2 no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/></svg>
-          Orders
-        </Link>
-        <Link href="/vendor/menu" className="flex flex-col items-center justify-center gap-1 text-xs font-medium text-ink-2 no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>
-          Menu
-        </Link>
-        <Link href="/vendor/earnings" className="flex flex-col items-center justify-center gap-1 text-xs font-bold text-brand no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>
-          Earnings
-        </Link>
-      </nav>
+      <VendorNav />
     </div>
   )
 }

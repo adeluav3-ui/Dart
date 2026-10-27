@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { X, ChevronRight, MapPin, Mail, HelpCircle, Store, Bike, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import type { Profile } from '@/types/database'
+import { normalizePhone, validatePhone } from '@/lib/phone'
+import type { Profile, Application } from '@/types/database'
 
 const APP_VERSION = '1.0.0'
 
@@ -19,12 +21,20 @@ function initials(name: string | null): string {
 interface Props {
   profile: Profile | null
   email: string | null
+  applications: Application[]
 }
 
-export function AccountClient({ profile, email }: Props) {
-  const [sheet, setSheet] = useState<'edit' | 'sell' | 'ride' | 'help' | null>(null)
+export function AccountClient({ profile, email, applications }: Props) {
+  const [sheet, setSheet] = useState<'edit' | 'help' | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  const roles: string[] = profile?.roles ?? ['customer']
+  const isVendor = roles.includes('vendor')
+  const isRider = roles.includes('rider')
+
+  const vendorApp = applications.find(a => a.kind === 'vendor')
+  const riderApp = applications.find(a => a.kind === 'rider')
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -62,7 +72,29 @@ export function AccountClient({ profile, email }: Props) {
           </button>
         </div>
 
-        {/* Main sections */}
+        {/* Switch to other dashboard if approved */}
+        {(isVendor || isRider) && (
+          <div className="bg-white rounded-2xl overflow-hidden">
+            {isVendor && (
+              <SectionRow
+                icon={<Store size={18} />}
+                title="Vendor dashboard"
+                subtitle="Manage your menu and orders"
+                href="/vendor"
+              />
+            )}
+            {isRider && (
+              <SectionRow
+                icon={<Bike size={18} />}
+                title="Rider dashboard"
+                subtitle="View your current job"
+                href="/rider"
+              />
+            )}
+          </div>
+        )}
+
+        {/* Addresses + Email */}
         <div className="bg-white rounded-2xl overflow-hidden">
           <SectionRow
             icon={<MapPin size={18} />}
@@ -87,19 +119,26 @@ export function AccountClient({ profile, email }: Props) {
           />
         </div>
 
+        {/* Apply / application status */}
         <div className="bg-white rounded-2xl overflow-hidden">
-          <SectionRow
-            icon={<Store size={18} />}
-            title="Sell on Dart"
-            subtitle="List your kitchen, shop or pharmacy"
-            onPress={() => setSheet('sell')}
-          />
-          <SectionRow
-            icon={<Bike size={18} />}
-            title="Ride with Dart"
-            subtitle="Earn delivering in Sagamu"
-            onPress={() => setSheet('ride')}
-          />
+          {!isVendor && (
+            <ApplicationRow
+              icon={<Store size={18} />}
+              title="Sell on Dart"
+              subtitle="List your kitchen, shop or pharmacy"
+              kind="vendor"
+              app={vendorApp ?? null}
+            />
+          )}
+          {!isRider && (
+            <ApplicationRow
+              icon={<Bike size={18} />}
+              title="Ride with Dart"
+              subtitle="Earn delivering in Sagamu"
+              kind="rider"
+              app={riderApp ?? null}
+            />
+          )}
           <SectionRow
             icon={<FileText size={18} />}
             title="Terms and privacy"
@@ -128,15 +167,81 @@ export function AccountClient({ profile, email }: Props) {
           onSaved={() => { setSheet(null); router.refresh() }}
         />
       )}
-      {sheet === 'sell' && (
-        <SellOnDartSheet onClose={() => setSheet(null)} profile={profile} />
-      )}
-      {sheet === 'ride' && (
-        <RideWithDartSheet onClose={() => setSheet(null)} profile={profile} />
-      )}
       {sheet === 'help' && (
         <HelpSheet onClose={() => setSheet(null)} />
       )}
+    </div>
+  )
+}
+
+function ApplicationRow({
+  icon,
+  title,
+  subtitle,
+  kind,
+  app,
+}: {
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+  kind: 'vendor' | 'rider'
+  app: Application | null
+}) {
+  if (!app) {
+    return (
+      <Link href={`/account/apply/${kind}`} className="block no-underline">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-line last:border-0">
+          <div className="w-9 h-9 rounded-xl bg-surface flex items-center justify-center shrink-0 text-ink-2">{icon}</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-semibold text-ink">{title}</p>
+            <p className="text-[12px] text-ink-2 mt-0.5 truncate">{subtitle}</p>
+          </div>
+          <ChevronRight size={18} className="text-ink-2 shrink-0" />
+        </div>
+      </Link>
+    )
+  }
+
+  const canReapply = app.status === 'rejected' && (() => {
+    const decided = app.decided_at ? new Date(app.decided_at).getTime() : 0
+    return Date.now() - decided > 30 * 24 * 60 * 60 * 1000
+  })()
+
+  const statusLabel: Record<string, string> = {
+    submitted: 'Under review',
+    contacted: 'We contacted you',
+    approved: 'Approved',
+    rejected: 'Not approved',
+  }
+  const statusColor: Record<string, string> = {
+    submitted: 'bg-warn-tint text-warn',
+    contacted: 'bg-brand-tint text-brand-ink',
+    approved: 'bg-brand-tint text-brand-ink',
+    rejected: 'bg-red-50 text-danger',
+  }
+
+  return (
+    <div className="flex items-start gap-3 px-4 py-3.5 border-b border-line last:border-0">
+      <div className="w-9 h-9 rounded-xl bg-surface flex items-center justify-center shrink-0 text-ink-2">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[15px] font-semibold text-ink">{title}</p>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${statusColor[app.status] ?? ''}`}>
+            {statusLabel[app.status] ?? app.status}
+          </span>
+        </div>
+        {app.status === 'rejected' && app.admin_note && (
+          <p className="text-[12px] text-ink-2 mt-0.5">{app.admin_note}</p>
+        )}
+        {app.status === 'rejected' && !canReapply && (
+          <p className="text-[12px] text-ink-2 mt-0.5">You can reapply after 30 days.</p>
+        )}
+        {app.status === 'rejected' && canReapply && (
+          <Link href={`/account/apply/${kind}`} className="text-[12px] text-brand font-semibold mt-0.5 block">
+            Reapply now →
+          </Link>
+        )}
+      </div>
     </div>
   )
 }
@@ -167,10 +272,7 @@ function SectionRow({
     </div>
   )
 
-  if (href) {
-    const Link = require('next/link').default
-    return <Link href={href} className="block no-underline">{inner}</Link>
-  }
+  if (href) return <Link href={href} className="block no-underline">{inner}</Link>
   return <button type="button" onClick={onPress} className="w-full text-left">{inner}</button>
 }
 
@@ -199,193 +301,66 @@ function SheetWrapper({ title, onClose, children }: { title: string; onClose: ()
 
 function EditProfileSheet({ profile, onClose, onSaved }: { profile: Profile | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(profile?.full_name ?? '')
-  const [phone, setPhone] = useState(profile?.phone ?? '')
+  const [rawPhone, setRawPhone] = useState(() => {
+    const p = profile?.phone ?? ''
+    // Strip +234 prefix for display in the input
+    return p.startsWith('+234') ? p.slice(4) : p.startsWith('0') ? p.slice(1) : p
+  })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const supabase = createClient()
 
   async function save() {
     if (!profile) return
-    setError('')
-    if (!name.trim()) { setError('Enter your name'); return }
+    setNameError('')
+    setPhoneError('')
+
+    const nameTrimmed = name.trim()
+    if (!nameTrimmed) { setNameError('Enter your full name'); return }
+    if (nameTrimmed.split(/\s+/).length < 2) { setNameError('Enter both first and last name'); return }
+
+    const fullRaw = '0' + rawPhone.replace(/\D/g, '')
+    if (!validatePhone(fullRaw)) { setPhoneError('Enter a valid Nigerian mobile number'); return }
+    const normalised = normalizePhone(fullRaw)!
+
     setSaving(true)
-    const normalised = phone.trim().replace(/^0/, '+234')
-    const { error: dbErr } = await supabase
+    const { error } = await supabase
       .from('profiles')
-      .update({ full_name: name.trim(), phone: normalised || null })
+      .update({ full_name: nameTrimmed, phone: normalised })
       .eq('id', profile.id)
     setSaving(false)
-    if (dbErr) { setError(dbErr.message); return }
+    if (error) { setPhoneError(error.message); return }
     onSaved()
   }
 
   return (
     <SheetWrapper title="Edit profile" onClose={onClose}>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-semibold text-ink-2">Full name</span>
-        <input type="text" value={name} onChange={e => setName(e.target.value)}
-          placeholder="Your name"
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[12px] font-semibold text-ink-2">Full name</label>
+        <input type="text" value={name} onChange={e => { setName(e.target.value); setNameError('') }}
+          placeholder="First and last name"
           className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-semibold text-ink-2">Phone number</span>
-        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-          placeholder="e.g. 08012345678"
-          className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-      </label>
-      {error && <p className="text-[13px] text-danger">{error}</p>}
+        {nameError && <p className="text-[12px] text-danger">{nameError}</p>}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[12px] font-semibold text-ink-2">Phone number</label>
+        <div className="flex h-11 rounded-xl border border-line bg-white overflow-hidden">
+          <div className="flex items-center px-3 border-r border-line bg-surface shrink-0">
+            <span className="text-[13px] font-semibold text-ink-2">NG +234</span>
+          </div>
+          <input
+            type="tel"
+            inputMode="tel"
+            value={rawPhone}
+            onChange={e => { setRawPhone(e.target.value); setPhoneError('') }}
+            placeholder="8012345678"
+            className="flex-1 px-3 font-body text-[14px] text-ink bg-transparent focus:outline-none"
+          />
+        </div>
+        {phoneError && <p className="text-[12px] text-danger">{phoneError}</p>}
+      </div>
       <Button onClick={save} loading={saving} fullWidth size="lg">Save changes</Button>
-    </SheetWrapper>
-  )
-}
-
-function SellOnDartSheet({ onClose, profile }: { onClose: () => void; profile: Profile | null }) {
-  const [bizName, setBizName] = useState('')
-  const [type, setType] = useState('restaurant')
-  const [area, setArea] = useState('')
-  const [phone, setPhone] = useState(profile?.phone ?? '')
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(false)
-  const [error, setError] = useState('')
-  const supabase = createClient()
-
-  async function submit() {
-    setError('')
-    if (!bizName.trim()) { setError('Enter your business name'); return }
-    if (!area.trim()) { setError('Enter your area'); return }
-    if (!phone.trim()) { setError('Enter a phone number'); return }
-    setSaving(true)
-    const { error: dbErr } = await supabase.from('vendor_applications').insert({
-      user_id: profile?.id ?? null,
-      business_name: bizName.trim(),
-      type,
-      area_name: area.trim(),
-      phone: phone.trim(),
-    })
-    setSaving(false)
-    if (dbErr) { setError(dbErr.message); return }
-    setDone(true)
-  }
-
-  return (
-    <SheetWrapper title="Sell on Dart" onClose={onClose}>
-      {done ? (
-        <div className="flex flex-col items-center gap-3 py-4 text-center">
-          <div className="w-14 h-14 rounded-full bg-brand-tint flex items-center justify-center">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
-          </div>
-          <p className="font-heading font-bold text-[17px] text-ink">Request received!</p>
-          <p className="text-[14px] text-ink-2">We&apos;ll review your application and call you within 48 hours.</p>
-          <Button onClick={onClose} fullWidth size="lg">Done</Button>
-        </div>
-      ) : (
-        <>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Business name</span>
-            <input type="text" value={bizName} onChange={e => setBizName(e.target.value)} placeholder="e.g. Mama Tolu's Kitchen"
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Type</span>
-            <select value={type} onChange={e => setType(e.target.value)}
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink bg-white">
-              <option value="restaurant">Restaurant / Kitchen</option>
-              <option value="supermarket">Supermarket / Grocery</option>
-              <option value="pharmacy">Pharmacy</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Area in Sagamu</span>
-            <input type="text" value={area} onChange={e => setArea(e.target.value)} placeholder="e.g. Isale-Oko"
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Phone number</span>
-            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08012345678"
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-          </label>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
-          <Button onClick={submit} loading={saving} fullWidth size="lg">Submit application</Button>
-        </>
-      )}
-    </SheetWrapper>
-  )
-}
-
-function RideWithDartSheet({ onClose, profile }: { onClose: () => void; profile: Profile | null }) {
-  const [name, setName] = useState(profile?.full_name ?? '')
-  const [phone, setPhone] = useState(profile?.phone ?? '')
-  const [area, setArea] = useState('')
-  const [hasBike, setHasBike] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(false)
-  const [error, setError] = useState('')
-  const supabase = createClient()
-
-  async function submit() {
-    setError('')
-    if (!name.trim()) { setError('Enter your name'); return }
-    if (!phone.trim()) { setError('Enter your phone number'); return }
-    if (!area.trim()) { setError('Enter your area'); return }
-    setSaving(true)
-    const { error: dbErr } = await supabase.from('rider_applications').insert({
-      user_id: profile?.id ?? null,
-      full_name: name.trim(),
-      phone: phone.trim(),
-      area_name: area.trim(),
-      has_bike: hasBike,
-    })
-    setSaving(false)
-    if (dbErr) { setError(dbErr.message); return }
-    setDone(true)
-  }
-
-  return (
-    <SheetWrapper title="Ride with Dart" onClose={onClose}>
-      {done ? (
-        <div className="flex flex-col items-center gap-3 py-4 text-center">
-          <div className="w-14 h-14 rounded-full bg-brand-tint flex items-center justify-center">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
-          </div>
-          <p className="font-heading font-bold text-[17px] text-ink">Application submitted!</p>
-          <p className="text-[14px] text-ink-2">We&apos;ll call you within 48 hours to complete onboarding.</p>
-          <Button onClick={onClose} fullWidth size="lg">Done</Button>
-        </div>
-      ) : (
-        <>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Full name</span>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your full name"
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Phone number</span>
-            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08012345678"
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-ink-2">Area you live in</span>
-            <input type="text" value={area} onChange={e => setArea(e.target.value)} placeholder="e.g. Ijokun"
-              className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-          </label>
-          <button
-            type="button"
-            onClick={() => setHasBike(!hasBike)}
-            className={`flex items-center gap-3 h-12 px-4 rounded-xl border-2 text-[14px] font-semibold transition-colors ${
-              hasBike ? 'border-brand bg-brand-tint text-brand-ink' : 'border-line text-ink'
-            }`}
-          >
-            <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
-              hasBike ? 'bg-brand border-brand' : 'border-line'
-            }`}>
-              {hasBike && <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>}
-            </div>
-            I have my own motorcycle
-          </button>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
-          <Button onClick={submit} loading={saving} fullWidth size="lg">Submit application</Button>
-        </>
-      )}
     </SheetWrapper>
   )
 }
@@ -404,7 +379,6 @@ function HelpSheet({ onClose }: { onClose: () => void }) {
           </a>
           <p className="text-[12px] text-brand-ink/70 text-center">Mon – Sat · 8 am – 9 pm</p>
         </div>
-
         <div className="flex flex-col gap-2">
           <p className="text-[13px] font-semibold text-ink-2">Common questions</p>
           {[

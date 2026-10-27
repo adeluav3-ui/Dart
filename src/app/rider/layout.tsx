@@ -8,11 +8,12 @@ export default async function RiderLayout({ children }: { children: React.ReactN
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('roles')
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'rider' && profile.role !== 'admin')) redirect('/')
+  const roles: string[] = profile?.roles ?? []
+  if (!roles.includes('rider') && !roles.includes('admin')) redirect('/')
 
   return <>{children}</>
 }

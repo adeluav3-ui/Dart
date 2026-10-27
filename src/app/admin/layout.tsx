@@ -35,6 +35,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           { href: '/admin/riders', label: 'Riders' },
           { href: '/admin/money', label: 'Money' },
           { href: '/admin/metrics', label: 'Metrics' },
+          { href: '/admin/review', label: 'Review' },
+          { href: '/admin/applications', label: 'Applications' },
         ].map(item => (
           <Link
             key={item.href}

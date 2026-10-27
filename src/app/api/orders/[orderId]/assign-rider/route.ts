@@ -27,12 +27,12 @@ export async function POST(
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   if (order.status !== 'accepted') return NextResponse.json({ error: 'Order not in accepted state' }, { status: 400 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('roles').eq('id', user.id).single()
   const vendorRow = (Array.isArray(order.vendors) ? order.vendors[0] : order.vendors) as {
     owner_id: string | null; area_id: string | null; zone_id: string | null
   } | null
   const isVendor = vendorRow?.owner_id === user.id
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.roles?.includes('admin') ?? false
   if (!isVendor && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Verify rider is available and get their location

@@ -18,7 +18,23 @@ export interface Profile {
   phone: string | null
   full_name: string | null
   role: UserRole
+  roles: string[]
+  last_dashboard: string | null
   created_at: string
+}
+
+export type ApplicationKind = 'vendor' | 'rider'
+export type ApplicationStatus = 'submitted' | 'contacted' | 'approved' | 'rejected'
+
+export interface Application {
+  id: string
+  user_id: string
+  kind: ApplicationKind
+  status: ApplicationStatus
+  data: Record<string, unknown>
+  admin_note: string | null
+  created_at: string
+  decided_at: string | null
 }
 
 export interface Vendor {
@@ -59,6 +75,8 @@ export interface MenuCategory {
   sort_order: number
 }
 
+export type MenuItemStatus = 'draft' | 'in_review' | 'live' | 'rejected'
+
 export interface MenuItem {
   id: string
   vendor_id: string
@@ -70,6 +88,22 @@ export interface MenuItem {
   pack_size: string | null
   stock_qty: number | null
   is_available: boolean
+  sort_order: number
+  status: MenuItemStatus
+  review_note: string | null
+  is_sold_out: boolean
+  pending_price: number | null
+  pending_photo_url: string | null
+}
+
+export interface MenuTemplate {
+  id: string
+  store_type: VendorType
+  pack_name: string
+  category_name: string
+  item_name: string
+  description: string | null
+  default_option_groups: unknown | null
   sort_order: number
 }
 
@@ -291,27 +325,6 @@ export interface PayoutRequest {
   created_at: string
 }
 
-export interface VendorApplication {
-  id: string
-  user_id: string
-  business_name: string
-  business_type: VendorType
-  area: string
-  phone: string
-  status: string
-  created_at: string
-}
-
-export interface RiderApplication {
-  id: string
-  user_id: string
-  full_name: string
-  phone: string
-  area: string
-  has_bike: boolean
-  status: string
-  created_at: string
-}
 
 // Cart types (client-only)
 export interface CartItem {

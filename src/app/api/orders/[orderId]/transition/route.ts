@@ -18,7 +18,7 @@ export async function POST(
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('roles')
     .eq('id', user.id)
     .single()
 
@@ -41,7 +41,7 @@ export async function POST(
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
   // Permission checks
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.roles?.includes('admin') ?? false
   const isVendor = order.vendors?.owner_id === user.id
   const isRider = order.rider_id === user.id
   const isCustomer = order.customer_id === user.id

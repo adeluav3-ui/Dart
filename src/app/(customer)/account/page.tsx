@@ -37,11 +37,16 @@ export default async function AccountPage() {
     )
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profile }, { data: applications }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('applications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+  ])
 
-  return <AccountClient profile={profile} email={user.email ?? null} />
+  return (
+    <AccountClient
+      profile={profile}
+      email={user.email ?? null}
+      applications={applications ?? []}
+    />
+  )
 }

@@ -7,8 +7,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(new URL('/login', req.url))
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return NextResponse.redirect(new URL('/admin', req.url))
+  const { data: profile } = await supabase.from('profiles').select('roles').eq('id', user.id).single()
+  if (!profile?.roles?.includes('admin')) return NextResponse.redirect(new URL('/admin', req.url))
 
   const formData = await req.formData()
   const ids = (formData.get('entryIds') as string ?? '').split(',').filter(Boolean)

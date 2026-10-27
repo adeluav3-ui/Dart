@@ -176,6 +176,115 @@ export async function sendAdminNoRiderEmail({
   })
 }
 
+export async function sendAdminVendorReviewEmail({
+  vendorName,
+  vendorId,
+}: {
+  vendorName: string
+  vendorId: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `New vendor ready for review — ${vendorName}`,
+    html: html(`
+      <h2>Vendor submitted for review</h2>
+      <p><strong>${vendorName}</strong> has completed their setup and is requesting approval.</p>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/admin/review`, 'Review now')}
+      <p style="color:#5B6168;font-size:13px">Vendor ID: ${vendorId}</p>
+    `),
+  })
+}
+
+export async function sendAdminItemReviewEmail({
+  vendorName,
+  itemName,
+  vendorId,
+}: {
+  vendorName: string
+  itemName: string
+  vendorId: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `Menu item submitted for review — ${itemName}`,
+    html: html(`
+      <h2>Item submitted for review</h2>
+      <p><strong>${vendorName}</strong> submitted <strong>${itemName}</strong> for review.</p>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/admin/review`, 'Review now')}
+      <p style="color:#5B6168;font-size:13px">Vendor ID: ${vendorId}</p>
+    `),
+  })
+}
+
+export async function sendAdminApplicationEmail({
+  kind,
+  applicantName,
+  data,
+}: {
+  kind: 'vendor' | 'rider'
+  applicantName: string
+  data: Record<string, unknown>
+}) {
+  const kindLabel = kind === 'vendor' ? 'Vendor' : 'Rider'
+  const dataRows = Object.entries(data)
+    .map(([k, v]) => `<tr><td style="padding:4px 8px;color:#5B6168;font-size:13px">${k.replace(/_/g, ' ')}</td><td style="padding:4px 8px;font-size:13px">${String(v)}</td></tr>`)
+    .join('')
+
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `New ${kindLabel} application — ${applicantName}`,
+    html: html(`
+      <h2>New ${kindLabel.toLowerCase()} application</h2>
+      <p><strong>${applicantName}</strong> has applied to ${kind === 'vendor' ? 'sell on' : 'ride with'} Dart.</p>
+      <table style="border-collapse:collapse;margin:12px 0">${dataRows}</table>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/admin/applications`, 'Review application')}
+    `),
+  })
+}
+
+export async function sendVendorApprovedEmail({
+  to,
+  name,
+}: {
+  to: string
+  name: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: 'Your Dart vendor application was approved!',
+    html: html(`
+      <h2 style="color:#0B7A47">You're on Dart!</h2>
+      <p>Hi ${name}, your vendor application has been approved.</p>
+      <p>Sign in to your account, open the Vendor dashboard, and complete your shop setup. Your menu goes live once you've added photos and prices for at least 3 items.</p>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/vendor`, 'Go to vendor dashboard')}
+    `),
+  })
+}
+
+export async function sendRiderApprovedEmail({
+  to,
+  name,
+}: {
+  to: string
+  name: string
+}) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: 'Your Dart rider application was approved!',
+    html: html(`
+      <h2 style="color:#0B7A47">Welcome to the Dart team!</h2>
+      <p>Hi ${name}, your rider application has been approved.</p>
+      <p>Sign in to your account and open the Rider dashboard to start accepting jobs.</p>
+      ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/rider`, 'Go to rider dashboard')}
+    `),
+  })
+}
+
 export async function sendAdminNoRiderAssignedEmail({
   vendorName,
   orderCode,

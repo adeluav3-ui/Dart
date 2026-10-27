@@ -7,8 +7,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: profile } = await supabase.from('profiles').select('roles').eq('id', user.id).single()
+  if (!profile?.roles?.includes('admin')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { userId, businessName, slug, type, zoneId, commissionRate, avgPrepMins } = await req.json()
   if (!userId || !businessName || !slug || !type || !zoneId) {
@@ -32,9 +32,16 @@ export async function POST(req: NextRequest) {
   })
   if (vendorErr) return NextResponse.json({ error: vendorErr.message }, { status: 500 })
 
-  const { error: roleErr } = await admin.from('profiles')
-    .upsert({ id: userId, role: 'vendor' }, { onConflict: 'id' })
-  if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 })
+  // Append 'vendor' to roles; trigger keeps role column in sync
+  const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
+  const existing: string[] = target?.roles ?? ['customer']
+  if (!existing.includes('vendor')) {
+    const { error: roleErr } = await admin
+      .from('profiles')
+      .update({ roles: [...existing, 'vendor'] })
+      .eq('id', userId)
+    if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

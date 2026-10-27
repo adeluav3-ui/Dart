@@ -14,8 +14,16 @@ export default async function VendorMenuPage() {
   if (!vendor) return <p className="p-6 text-ink-2">No vendor account found.</p>
 
   const [{ data: categories }, { data: items }] = await Promise.all([
-    supabase.from('menu_categories').select('*').eq('vendor_id', vendor.id).order('sort_order'),
-    supabase.from('menu_items').select('*').eq('vendor_id', vendor.id).order('sort_order'),
+    supabase
+      .from('menu_categories')
+      .select('*')
+      .eq('vendor_id', vendor.id)
+      .order('sort_order'),
+    supabase
+      .from('menu_items')
+      .select('*')
+      .eq('vendor_id', vendor.id)
+      .order('sort_order'),
   ])
 
   return (

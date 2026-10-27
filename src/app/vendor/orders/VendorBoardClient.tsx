@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
+import { VendorNav } from '@/components/vendor/VendorNav'
 import type { Vendor, Order, OrderItem, OrderStatus } from '@/types/database'
 
 type Tab = 'paid' | 'accepted' | 'ready'
@@ -36,12 +37,20 @@ interface OrderWithItems extends Order {
   order_items: OrderItem[]
 }
 
+export interface SetupStep {
+  key: string
+  label: string
+  done: boolean
+  href: string
+}
+
 interface Props {
   vendor: Vendor
   initialOrders: OrderWithItems[]
+  setupSteps?: SetupStep[]
 }
 
-export function VendorBoardClient({ vendor, initialOrders }: Props) {
+export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) {
   const [orders, setOrders] = useState<OrderWithItems[]>(initialOrders)
   const [tab, setTab] = useState<Tab>('paid')
   const [prepTimes, setPrepTimes] = useState<Record<string, number>>({})
@@ -57,6 +66,9 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const prevNewCount = useRef(initialOrders.filter(o => o.status === 'paid').length)
   const pushSubRef = useRef<PushSubscription | null>(null)
+
+  const showChecklist = !vendor.is_verified && setupSteps && setupSteps.length > 0
+  const stepsComplete = setupSteps ? setupSteps.every(s => s.done) : false
 
   // Register web push subscription
   useEffect(() => {
@@ -156,7 +168,6 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
       setOrders(prev => prev.map(o =>
         o.id === confirmAssign.orderId ? { ...o, rider_id: confirmAssign.riderId } : o
       ))
-      // Re-fetch riders to refresh availability
       setAvailableRiders(null)
     }
     setAssigning(false)
@@ -175,6 +186,15 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
     const newOpen = !isOpen
     setIsOpen(newOpen)
     await supabase.from('vendors').update({ is_open: newOpen }).eq('id', vendor.id)
+  }
+
+  async function submitForReview() {
+    await fetch('/api/vendor/submit-for-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendorId: vendor.id }),
+    })
+    alert('Request sent! We\'ll review your shop and get back to you within 24 hours.')
   }
 
   function elapsedLabel(ts: string | null) {
@@ -244,6 +264,59 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
           <span className="w-7 h-7 rounded-full bg-white" />
         </button>
       </header>
+
+      {/* Setup checklist (shown while not verified) */}
+      {showChecklist && (
+        <div className="px-4 py-4 flex flex-col gap-3">
+          <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="font-heading font-bold text-base">Complete your setup</span>
+              <span className="text-[13px] text-ink-2">
+                {setupSteps!.filter(s => s.done).length}/{setupSteps!.length} done
+              </span>
+            </div>
+
+            {setupSteps!.map((step, i) => (
+              <Link
+                key={step.key}
+                href={step.href}
+                className="flex items-center gap-3 no-underline"
+              >
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  step.done ? 'bg-brand text-white' : 'bg-surface text-ink-2 border border-line'
+                }`}>
+                  {step.done ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                  ) : i + 1}
+                </span>
+                <span className={`text-sm font-medium flex-1 ${step.done ? 'line-through text-ink-2' : 'text-ink'}`}>
+                  {step.label}
+                </span>
+                {!step.done && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink-2">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                )}
+              </Link>
+            ))}
+
+            {stepsComplete && (
+              <button
+                type="button"
+                onClick={submitForReview}
+                className="w-full h-btn rounded-2xl bg-brand text-white font-body text-base font-bold border-0 mt-1"
+              >
+                Submit for review
+              </button>
+            )}
+            {!stepsComplete && (
+              <p className="text-[12px] text-ink-2 text-center">
+                Complete all steps to submit your shop for review
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div role="tablist" className="grid grid-cols-3 gap-1.5 px-4 py-3 bg-ink">
         {TABS.map(t => {
@@ -346,7 +419,6 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
 
             {tab === 'accepted' && (
               <>
-                {/* Rider assignment */}
                 {!order.rider_id ? (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
@@ -446,20 +518,7 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
         ))}
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 h-[72px] px-3 pb-3.5 pt-2 bg-white border-t border-line grid grid-cols-3">
-        <Link href="/vendor/orders" className="flex flex-col items-center justify-center gap-1 text-xs font-bold text-brand no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/></svg>
-          Orders
-        </Link>
-        <Link href="/vendor/menu" className="flex flex-col items-center justify-center gap-1 text-xs font-medium text-ink-2 no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>
-          Menu
-        </Link>
-        <Link href="/vendor/earnings" className="flex flex-col items-center justify-center gap-1 text-xs font-medium text-ink-2 no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>
-          Earnings
-        </Link>
-      </nav>
+      <VendorNav newOrderCount={newCount} />
     </div>
   )
 }
