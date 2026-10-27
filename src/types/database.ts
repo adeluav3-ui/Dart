@@ -338,6 +338,7 @@ export interface CartItem {
 }
 
 export interface Cart {
+  userId: string | null
   vendorId: string
   vendorSlug: string
   vendorName: string

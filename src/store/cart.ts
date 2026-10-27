@@ -6,6 +6,7 @@ import type { Cart, CartItem, MenuItem, OptionGroup, Option } from '@/types/data
 
 interface CartStore {
   cart: Cart | null
+  claimCart: (userId: string | null) => void
   addItem: (
     vendorId: string,
     vendorSlug: string,
@@ -45,6 +46,18 @@ export const useCart = create<CartStore>()(
     (set, get) => ({
       cart: null,
 
+      claimCart(userId) {
+        set(state => {
+          if (!state.cart) return state
+          // Cart already belongs to this user — nothing to do
+          if (state.cart.userId === userId) return state
+          // Cart is unclaimed (guest added it) — claim it for this user
+          if (state.cart.userId === null) return { cart: { ...state.cart, userId } }
+          // Cart belongs to a different user — clear it
+          return { cart: null }
+        })
+      },
+
       addItem(vendorId, vendorSlug, vendorName, vendorZoneId, item, qty, selectedOptions) {
         const { cart } = get()
         if (cart && cart.vendorId !== vendorId) return 'conflict'
@@ -54,6 +67,7 @@ export const useCart = create<CartStore>()(
 
         set(state => ({
           cart: {
+            userId: state.cart?.userId ?? null,
             vendorId,
             vendorSlug,
             vendorName,
@@ -103,7 +117,7 @@ export const useCart = create<CartStore>()(
     }),
     {
       name: 'dart-cart',
-      version: 2,
+      version: 3,
       migrate: () => ({ cart: null }),
     }
   )
