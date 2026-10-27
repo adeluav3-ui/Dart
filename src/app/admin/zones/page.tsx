@@ -107,7 +107,7 @@ export default function AdminZonesPage() {
       <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
         <h3 className="font-bold text-sm">Add zone</h3>
         <div className="flex gap-2">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <Input
               label=""
               placeholder="Zone name (e.g. Central)"
@@ -125,13 +125,13 @@ export default function AdminZonesPage() {
         <h3 className="font-bold text-sm">Zones</h3>
         {zones.map(zone => (
           <div key={zone.id} className="flex items-center gap-3 py-1.5">
-            <span className="flex-1 text-sm font-semibold">{zone.name}</span>
+            <span className="flex-1 min-w-0 text-sm font-semibold truncate">{zone.name}</span>
             <button
               type="button"
               role="switch"
               aria-checked={zone.is_active}
               onClick={() => toggleActive(zone)}
-              className={`relative w-11 h-6 rounded-full border-0 cursor-pointer transition-colors ${zone.is_active ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
+              className={`relative w-11 h-6 rounded-full border-0 cursor-pointer transition-colors shrink-0 ${zone.is_active ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${zone.is_active ? 'left-5' : 'left-0.5'}`} />
             </button>
@@ -145,7 +145,7 @@ export default function AdminZonesPage() {
           <div>
             <h3 className="font-bold text-sm">Delivery fares</h3>
             <p className="text-xs text-ink-2 mt-0.5">
-              One row per zone pair (including same-zone delivery). Toggle &ldquo;Serve&rdquo; to enable ordering between zones.
+              One row per zone pair (including same-zone delivery). Toggle to enable ordering between zones.
             </p>
           </div>
           {pairs.map(({ a, b, same }) => {
@@ -154,25 +154,31 @@ export default function AdminZonesPage() {
             const key = pairKey(a.id, b.id)
             const isDirty = !!fareEdit[key]
             return (
-              <div key={key} className="flex flex-col gap-1.5 py-3 border-b border-line last:border-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">
+              <div key={key} className="flex flex-col gap-2 py-3 border-b border-line last:border-0">
+                {/* Pair header + serviceable toggle */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold min-w-0 truncate">
                     {same ? `${a.name} → ${a.name}` : `${a.name} ↔ ${b.name}`}
                   </span>
                   {existing && (
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={existing.is_serviceable}
-                      onClick={() => toggleServiceable(a.id, b.id)}
-                      className={`relative w-9 h-5 rounded-full border-0 cursor-pointer transition-colors flex-none ${existing.is_serviceable ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${existing.is_serviceable ? 'left-4' : 'left-0.5'}`} />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] text-ink-2">{existing.is_serviceable ? 'Serving' : 'Off'}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={existing.is_serviceable}
+                        onClick={() => toggleServiceable(a.id, b.id)}
+                        className={`relative w-9 h-5 rounded-full border-0 cursor-pointer transition-colors ${existing.is_serviceable ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${existing.is_serviceable ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
                   )}
                 </div>
-                <div className="flex items-end gap-2">
-                  <label className="flex flex-col gap-0.5 flex-1">
+
+                {/* Two inputs side by side */}
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-0.5">
                     <span className="text-[11px] text-ink-2">Delivery (₦)</span>
                     <input
                       type="number"
@@ -180,10 +186,10 @@ export default function AdminZonesPage() {
                       value={edit.delivery_fee}
                       onChange={e => setEdit(a.id, b.id, 'delivery_fee', e.target.value)}
                       placeholder="0"
-                      className="h-9 px-2 rounded-lg border border-line text-sm font-body"
+                      className="h-9 px-2 rounded-lg border border-line text-sm font-body w-full"
                     />
                   </label>
-                  <label className="flex flex-col gap-0.5 flex-1">
+                  <label className="flex flex-col gap-0.5">
                     <span className="text-[11px] text-ink-2">Rider pay (₦)</span>
                     <input
                       type="number"
@@ -191,18 +197,21 @@ export default function AdminZonesPage() {
                       value={edit.rider_pay}
                       onChange={e => setEdit(a.id, b.id, 'rider_pay', e.target.value)}
                       placeholder="0"
-                      className="h-9 px-2 rounded-lg border border-line text-sm font-body"
+                      className="h-9 px-2 rounded-lg border border-line text-sm font-body w-full"
                     />
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => saveFare(a.id, b.id)}
-                    disabled={!isDirty && !!existing}
-                    className="h-9 px-3 rounded-lg bg-brand text-white text-sm font-bold border-0 disabled:opacity-40 shrink-0"
-                  >
-                    {existing ? 'Update' : 'Set'}
-                  </button>
                 </div>
+
+                {/* Save button full width */}
+                <button
+                  type="button"
+                  onClick={() => saveFare(a.id, b.id)}
+                  disabled={!isDirty && !!existing}
+                  className="h-9 w-full rounded-lg bg-brand text-white text-sm font-bold border-0 disabled:opacity-40"
+                >
+                  {existing ? 'Update' : 'Set fare'}
+                </button>
+
                 {existing && !isDirty && (
                   <span className="text-xs text-ink-2">
                     {formatMoney(existing.delivery_fee)} delivery · {formatMoney(existing.rider_pay)} rider pay
