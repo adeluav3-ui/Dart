@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { formatMoney } from '@/lib/format'
 import type { MenuItem, MenuItemStatus } from '@/types/database'
 
-interface ReviewItem extends MenuItem {
+export interface ReviewItem extends MenuItem {
   vendor_name: string
   category_name: string | null
 }

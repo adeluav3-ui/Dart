@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { ReviewQueueClient } from './ReviewQueueClient'
+import { ReviewQueueClient, type ReviewItem } from './ReviewQueueClient'
 
 export default async function AdminReviewPage() {
   const admin = createAdminClient()
@@ -38,8 +38,7 @@ export default async function AdminReviewPage() {
     ...i,
     vendor_name: i.vendors?.name ?? 'Unknown vendor',
     category_name: i.menu_categories?.name ?? null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any)
+  }) as ReviewItem)
 
   return <ReviewQueueClient initialItems={items} />
 }
