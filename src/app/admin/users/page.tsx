@@ -25,8 +25,11 @@ export default async function AdminUsersPage() {
   const users = (authUsers ?? []).map(u => ({
     id: u.id,
     email: u.email ?? '',
-    full_name: profileMap[u.id]?.full_name ?? null,
-    phone: profileMap[u.id]?.phone ?? null,
+    full_name: profileMap[u.id]?.full_name
+      ?? u.user_metadata?.full_name
+      ?? u.user_metadata?.name
+      ?? null,
+    phone: profileMap[u.id]?.phone ?? u.user_metadata?.phone ?? null,
     role: (profileMap[u.id]?.role ?? 'customer') as import('@/types/database').UserRole,
     created_at: u.created_at,
   })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
