@@ -141,6 +141,11 @@ export interface ZoneFare {
 export interface Rider {
   id: string
   is_active: boolean
+  is_available: boolean
+  lat: number | null
+  lng: number | null
+  location_accuracy: number | null
+  location_updated_at: string | null
   notes: string | null
   created_at: string
 }
@@ -205,6 +210,10 @@ export interface Order {
   gate_arrived_at: string | null
   gate_no_show: boolean
   gate_no_show_at: string | null
+  pickup_lat: number | null
+  pickup_lng: number | null
+  pickup_distance_m: number | null
+  rider_assigned_at: string | null
 }
 
 export interface OrderItem {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
@@ -15,11 +15,21 @@ const TABS: { value: Tab; label: string }[] = [
 
 const PREP_TIMES = [10, 20, 30, 45]
 
-interface RiderOption {
+interface AvailableRider {
   id: string
-  full_name: string | null
+  name: string
   phone: string | null
-  is_matched: boolean
+  nearestArea: string
+  distanceLabel: string
+  locationAgeLabel: string
+  hasOrderFromVendor: boolean
+}
+
+interface ConfirmAssign {
+  orderId: string
+  orderCode: string
+  riderId: string
+  riderName: string
 }
 
 interface OrderWithItems extends Order {
@@ -37,8 +47,12 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
   const [prepTimes, setPrepTimes] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(vendor.is_open)
-  const [riders, setRiders] = useState<RiderOption[]>([])
-  const [assigningOrder, setAssigningOrder] = useState<string | null>(null)
+
+  const [availableRiders, setAvailableRiders] = useState<AvailableRider[] | null>(null)
+  const [loadingRiders, setLoadingRiders] = useState(false)
+  const [confirmAssign, setConfirmAssign] = useState<ConfirmAssign | null>(null)
+  const [assigning, setAssigning] = useState(false)
+
   const supabase = createClient()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const prevNewCount = useRef(initialOrders.filter(o => o.status === 'paid').length)
@@ -74,12 +88,7 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
       .channel(`vendor:${vendor.id}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `vendor_id=eq.${vendor.id}`,
-        },
+        { event: '*', schema: 'public', table: 'orders', filter: `vendor_id=eq.${vendor.id}` },
         payload => {
           if (payload.eventType === 'INSERT') {
             setOrders(prev => [...prev, payload.new as OrderWithItems])
@@ -94,7 +103,7 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
     return () => { supabase.removeChannel(channel) }
   }, [vendor.id])
 
-  // Audio alarm + 60s push re-send for unaccepted paid orders
+  // Audio alarm for new orders
   useEffect(() => {
     const newCount = orders.filter(o => o.status === 'paid').length
     if (newCount > prevNewCount.current) {
@@ -106,43 +115,11 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
   useEffect(() => {
     const newOrders = orders.filter(o => o.status === 'paid')
     if (newOrders.length === 0) return
-
-    // Loop audio every 60s while paid orders exist
     const interval = setInterval(() => {
       audioRef.current?.play().catch(() => {})
     }, 60_000)
-
     return () => clearInterval(interval)
   }, [orders])
-
-  // Load riders (matched first, then all active Dart riders)
-  useEffect(() => {
-    async function loadRiders() {
-      const [{ data: matched }, { data: allRiders }] = await Promise.all([
-        supabase
-          .from('vendor_riders')
-          .select('rider_id')
-          .eq('vendor_id', vendor.id)
-          .order('sort_order'),
-        supabase
-          .from('riders')
-          .select('id, is_active, profiles(full_name, phone)')
-          .eq('is_active', true),
-      ])
-
-      const matchedIds = new Set((matched ?? []).map((r: { rider_id: string }) => r.rider_id))
-      type RiderData = { id: string; is_active: boolean; profiles: { full_name: string | null; phone: string | null }[] | null }
-      const list: RiderOption[] = (allRiders as unknown as RiderData[] ?? []).map(r => {
-        const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
-        return { id: r.id, full_name: p?.full_name ?? null, phone: p?.phone ?? null, is_matched: matchedIds.has(r.id) }
-      })
-
-      // Sort matched first
-      list.sort((a, b) => (a.is_matched === b.is_matched ? 0 : a.is_matched ? -1 : 1))
-      setRiders(list)
-    }
-    loadRiders()
-  }, [vendor.id])
 
   const tabOrders = orders.filter(o => o.status === tab)
   const newCount = orders.filter(o => o.status === 'paid').length
@@ -159,15 +136,31 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
     setLoading(null)
   }
 
-  async function assignRider(orderId: string, riderId: string) {
-    setAssigningOrder(orderId)
-    await fetch(`/api/orders/${orderId}/assign-rider`, {
+  async function loadAvailableRiders() {
+    setLoadingRiders(true)
+    const res = await fetch(`/api/vendor/available-riders?vendorId=${vendor.id}`)
+    const json = await res.json().catch(() => ({ riders: [] }))
+    setAvailableRiders(json.riders ?? [])
+    setLoadingRiders(false)
+  }
+
+  async function doAssignRider() {
+    if (!confirmAssign) return
+    setAssigning(true)
+    const res = await fetch(`/api/orders/${confirmAssign.orderId}/assign-rider`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ riderId }),
+      body: JSON.stringify({ riderId: confirmAssign.riderId }),
     })
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, rider_id: riderId } : o))
-    setAssigningOrder(null)
+    if (res.ok) {
+      setOrders(prev => prev.map(o =>
+        o.id === confirmAssign.orderId ? { ...o, rider_id: confirmAssign.riderId } : o
+      ))
+      // Re-fetch riders to refresh availability
+      setAvailableRiders(null)
+    }
+    setAssigning(false)
+    setConfirmAssign(null)
   }
 
   async function noRiderAvailable(orderId: string, orderCode: string) {
@@ -198,6 +191,41 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
         ref={audioRef}
         src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJiVm5SnqKilpaWko6SipKWlpaampampqamop6empaWkpKOjoqGhoKCfnp6dnJybm5qampqbm5ycnZ6en6ChoqOkpaamp6ipqqusrK2trq6vr6+vr7CwsLGxsLCwr6+urq6tra2trK2srK2tra6ur7CwsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrKy8zNzs/Q0dLS09TV1tbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w=="
       />
+
+      {/* Confirm assign sheet */}
+      {confirmAssign && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end justify-center z-50"
+          onClick={() => !assigning && setConfirmAssign(null)}
+        >
+          <div
+            className="bg-white rounded-t-3xl p-6 w-full max-w-sm flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-base font-bold text-center">
+              Assign {confirmAssign.riderName} to {confirmAssign.orderCode}?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={assigning}
+                onClick={() => setConfirmAssign(null)}
+                className="flex-1 h-btn rounded-2xl border border-line bg-white font-body text-base font-bold text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={assigning}
+                onClick={doAssignRider}
+                className="flex-1 h-btn rounded-2xl bg-brand text-white font-body text-base font-bold border-0 disabled:opacity-50"
+              >
+                {assigning ? 'Assigning…' : 'Yes, assign'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <header className="px-4 pt-4.5 pb-3 bg-ink text-white flex items-center justify-between">
         <span className="flex flex-col">
@@ -321,31 +349,70 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
                 {/* Rider assignment */}
                 {!order.rider_id ? (
                   <div className="flex flex-col gap-2">
-                    <span className="text-[13px] font-bold text-ink-2">Assign a rider — call first, then tap to confirm</span>
-                    {riders.map(r => (
-                      <div key={r.id} className="flex items-center gap-2">
-                        {r.is_matched && (
-                          <span className="text-[11px] font-bold text-brand bg-brand-tint px-1.5 py-0.5 rounded-md">Yours</span>
-                        )}
-                        <span className="flex-1 text-sm font-semibold">{r.full_name ?? 'Rider'}</span>
-                        {r.phone && (
-                          <a
-                            href={`tel:${r.phone}`}
-                            className="h-9 px-3 rounded-xl border border-line text-sm font-semibold text-ink-2 flex items-center no-underline"
-                          >
-                            Call
-                          </a>
-                        )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-bold text-ink-2">Assign a rider — call first, then tap Assign</span>
+                      {availableRiders !== null && (
                         <button
                           type="button"
-                          disabled={assigningOrder === order.id}
-                          onClick={() => assignRider(order.id, r.id)}
-                          className="h-9 px-3 rounded-xl bg-brand text-white text-sm font-bold border-0 disabled:opacity-50"
+                          onClick={loadAvailableRiders}
+                          disabled={loadingRiders}
+                          className="text-[12px] text-brand font-semibold"
                         >
-                          Assign
+                          Refresh
                         </button>
+                      )}
+                    </div>
+
+                    {availableRiders === null ? (
+                      <button
+                        type="button"
+                        onClick={loadAvailableRiders}
+                        disabled={loadingRiders}
+                        className="h-10 rounded-xl bg-brand-tint text-brand-ink text-sm font-bold border-0 disabled:opacity-50"
+                      >
+                        {loadingRiders ? 'Finding riders…' : 'Find available riders'}
+                      </button>
+                    ) : availableRiders.length === 0 ? (
+                      <p className="text-[13px] text-ink-2 text-center py-2">No riders available right now</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {availableRiders.map(r => (
+                          <div key={r.id} className="flex items-start gap-2 py-2 border-b border-line last:border-0">
+                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-bold">{r.name}</span>
+                                {r.hasOrderFromVendor && (
+                                  <span className="text-[10px] font-bold bg-brand-tint text-brand-ink px-1.5 py-0.5 rounded-md">
+                                    Has order from you
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[12px] text-ink-2">
+                                {r.nearestArea || '—'} · {r.distanceLabel} · {r.locationAgeLabel}
+                              </span>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              {r.phone && (
+                                <a
+                                  href={`tel:${r.phone}`}
+                                  className="h-9 px-3 rounded-xl border border-line text-sm font-semibold text-ink-2 flex items-center no-underline"
+                                >
+                                  Call
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setConfirmAssign({ orderId: order.id, orderCode: order.code, riderId: r.id, riderName: r.name })}
+                                className="h-9 px-3 rounded-xl bg-brand text-white text-sm font-bold border-0"
+                              >
+                                Assign
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+
                     <button
                       type="button"
                       onClick={() => noRiderAvailable(order.id, order.code)}
@@ -355,8 +422,9 @@ export function VendorBoardClient({ vendor, initialOrders }: Props) {
                     </button>
                   </div>
                 ) : (
-                  <span className="text-[13px] text-brand font-semibold">Rider assigned</span>
+                  <span className="text-[13px] text-brand font-semibold">Rider assigned ✓</span>
                 )}
+
                 <button
                   type="button"
                   disabled={loading === order.id}

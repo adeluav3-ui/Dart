@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Phone, Map } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
+import { STALE_MS } from '@/lib/geo'
 import type { Order, OrderItem } from '@/types/database'
 
 type JobOrder = Order & {
@@ -15,17 +16,30 @@ type JobOrder = Order & {
 interface Props {
   initialJobs: JobOrder[]
   riderId: string
+  initialAvailable: boolean
+  locationUpdatedAt: string | null
 }
 
 const WAIT_MS = 10 * 60 * 1000
+const LOCATION_REFRESH_MS = 2 * 60 * 1000
 
-export function RiderJobsClient({ initialJobs, riderId }: Props) {
+export function RiderJobsClient({ initialJobs, riderId, initialAvailable, locationUpdatedAt }: Props) {
   const [jobs, setJobs] = useState<JobOrder[]>(initialJobs)
   const [pinInputs, setPinInputs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
+
+  const [available, setAvailable] = useState(initialAvailable)
+  const [availLoading, setAvailLoading] = useState(false)
+  const [availError, setAvailError] = useState<string | null>(null)
+  const locationUpdatedRef = useRef<string | null>(locationUpdatedAt)
+
   const supabase = createClient()
+
+  const isLocationStale = initialAvailable &&
+    locationUpdatedAt &&
+    (Date.now() - new Date(locationUpdatedAt).getTime()) > STALE_MS
 
   // Clock for gate countdown
   useEffect(() => {
@@ -33,6 +47,7 @@ export function RiderJobsClient({ initialJobs, riderId }: Props) {
     return () => clearInterval(t)
   }, [])
 
+  // Realtime: new jobs assigned or status changes
   useEffect(() => {
     const channel = supabase
       .channel(`rider:${riderId}`)
@@ -55,6 +70,85 @@ export function RiderJobsClient({ initialJobs, riderId }: Props) {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [riderId])
+
+  // Background location refresh every 2 min while available and page open
+  useEffect(() => {
+    if (!available) return
+    const interval = setInterval(() => {
+      navigator.geolocation?.getCurrentPosition(pos => {
+        fetch('/api/rider/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            available: true,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+        }).then(() => {
+          locationUpdatedRef.current = new Date().toISOString()
+        }).catch(() => {})
+      })
+    }, LOCATION_REFRESH_MS)
+    return () => clearInterval(interval)
+  }, [available])
+
+  async function toggleAvailability() {
+    if (availLoading) return
+    setAvailError(null)
+
+    if (available) {
+      // Turn off — no location needed
+      setAvailLoading(true)
+      const res = await fetch('/api/rider/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ available: false }),
+      })
+      setAvailLoading(false)
+      if (res.ok) { setAvailable(false) } else { setAvailError('Could not update') }
+      return
+    }
+
+    // Turn on — request location first
+    if (!navigator.geolocation) {
+      setAvailError('Geolocation not supported by this browser')
+      return
+    }
+
+    setAvailLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const res = await fetch('/api/rider/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            available: true,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+        })
+        setAvailLoading(false)
+        if (res.ok) {
+          setAvailable(true)
+          locationUpdatedRef.current = new Date().toISOString()
+        } else {
+          const j = await res.json().catch(() => ({}))
+          setAvailError(j.error ?? 'Could not update')
+        }
+      },
+      err => {
+        setAvailLoading(false)
+        setAvailError(
+          err.code === 1
+            ? 'Location permission denied. Enable it in your browser settings.'
+            : 'Could not get your location. Try again.'
+        )
+      },
+      { timeout: 10_000 }
+    )
+  }
 
   async function api(path: string, body?: object) {
     setLoading(path)
@@ -97,9 +191,40 @@ export function RiderJobsClient({ initialJobs, riderId }: Props) {
         <h1 className="font-heading font-extrabold text-xl">My jobs</h1>
       </header>
 
+      {/* Availability toggle */}
+      <div className="mx-4 mt-4 bg-white rounded-2xl p-4 flex flex-col gap-3">
+        {isLocationStale && (
+          <div className="px-3 py-2 rounded-xl bg-warn-tint text-[13px] text-warn font-semibold">
+            Your location hasn&apos;t refreshed in over 30 minutes. Toggle availability to update it.
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-bold">
+              {available ? "I'm available" : "I'm not available"}
+            </span>
+            <span className="text-xs text-ink-2">
+              {available ? 'Vendors can see and call you for jobs' : "You won’t receive new job assignments"}
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={available}
+            disabled={availLoading}
+            onClick={toggleAvailability}
+            className={`relative w-14 h-7 rounded-full border-0 cursor-pointer transition-colors shrink-0 disabled:opacity-60 ${available ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
+          >
+            <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${available ? 'left-8' : 'left-1'}`} />
+          </button>
+        </div>
+        {availLoading && <p className="text-xs text-ink-2">Updating…</p>}
+        {availError && <p className="text-sm text-danger">{availError}</p>}
+      </div>
+
       <div className="px-4 py-4 flex flex-col gap-4">
         {pickupJobs.length === 0 && deliveryJobs.length === 0 && (
-          <p className="text-center text-ink-2 py-16">No active jobs</p>
+          <p className="text-center text-ink-2 py-10">No active jobs</p>
         )}
 
         {pickupJobs.length > 0 && (
@@ -296,7 +421,6 @@ function GateCard({
         {job.address_landmark && <span className="text-sm text-ink-2">{job.address_landmark}</span>}
       </div>
 
-      {/* State A: not yet arrived */}
       {!arrivedAt && !job.gate_no_show && (
         <button type="button" disabled={loading} onClick={onArrived}
           className="h-btn rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-50">
@@ -304,7 +428,6 @@ function GateCard({
         </button>
       )}
 
-      {/* State B: arrived, waiting */}
       {arrivedAt && !job.gate_no_show && (
         <>
           <div className="px-3 py-2.5 rounded-xl bg-brand-tint text-[13px] text-brand-ink flex items-center justify-between">
@@ -345,7 +468,6 @@ function GateCard({
         </>
       )}
 
-      {/* State C: no-show recorded */}
       {job.gate_no_show && (
         <div className="px-3 py-2.5 rounded-xl bg-warn-tint text-[13px] text-warn text-center font-semibold">
           No-show recorded — admin will decide on refund
