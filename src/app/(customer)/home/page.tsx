@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+
+export const revalidate = 60
 import { HomeClient } from '../HomeClient'
 import type { Vendor, Zone, Area, ZoneFare } from '@/types/database'
 

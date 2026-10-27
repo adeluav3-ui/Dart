@@ -3,43 +3,50 @@ import { notFound } from 'next/navigation'
 import { VendorPageClient } from './VendorPageClient'
 import type { Vendor, MenuCategory, MenuItem, OptionGroup, Option } from '@/types/database'
 
+export const revalidate = 30
+
 export default async function VendorPage({ params }: { params: { slug: string } }) {
   const supabase = createClient()
 
-  const { data: vendor } = await supabase
+  const { data: raw } = await supabase
     .from('vendors')
-    .select('*')
+    .select(`
+      *,
+      menu_categories(id, name, vendor_id, sort_order),
+      menu_items(
+        *,
+        option_groups(
+          id, item_id, name, min_select, max_select, sort_order,
+          options(id, group_id, name, price_delta, is_available, sort_order)
+        )
+      )
+    `)
     .eq('slug', params.slug)
     .single()
 
-  if (!vendor) notFound()
+  if (!raw) notFound()
 
-  const [{ data: categories }, { data: items }] = await Promise.all([
-    supabase.from('menu_categories').select('*').eq('vendor_id', vendor.id).order('sort_order'),
-    supabase.from('menu_items').select('*').eq('vendor_id', vendor.id).order('sort_order'),
-  ])
-
-  const itemIds = (items ?? []).map((i: MenuItem) => i.id)
-
-  const [{ data: groups }, { data: options }] = await Promise.all([
-    itemIds.length > 0
-      ? supabase.from('option_groups').select('*').in('item_id', itemIds).order('sort_order')
-      : Promise.resolve({ data: [] }),
-    itemIds.length > 0
-      ? supabase.from('options').select('*').order('sort_order')
-      : Promise.resolve({ data: [] }),
-  ])
-
-  const groupIds = (groups ?? []).map((g: OptionGroup) => g.id)
-  const filteredOptions = (options ?? []).filter((o: Option) => groupIds.includes(o.group_id))
+  // Flatten nested data into the flat arrays VendorPageClient expects
+  const vendor = raw as unknown as Vendor
+  const categories = ((raw as any).menu_categories ?? [] as MenuCategory[])
+    .sort((a: MenuCategory, b: MenuCategory) => a.sort_order - b.sort_order) as MenuCategory[]
+  const rawItems: any[] = ((raw as any).menu_items ?? [])
+    .sort((a: any, b: any) => a.sort_order - b.sort_order)
+  const items = rawItems.map(({ option_groups: _og, ...item }) => item) as MenuItem[]
+  const optionGroups = rawItems
+    .flatMap(i => (i.option_groups ?? []).map(({ options: _o, ...g }: any) => g))
+    .sort((a: any, b: any) => a.sort_order - b.sort_order) as OptionGroup[]
+  const options = rawItems
+    .flatMap(i => (i.option_groups ?? []).flatMap((g: any) => g.options ?? []))
+    .sort((a: any, b: any) => a.sort_order - b.sort_order) as Option[]
 
   return (
     <VendorPageClient
-      vendor={vendor as Vendor}
-      categories={(categories as MenuCategory[]) ?? []}
-      items={(items as MenuItem[]) ?? []}
-      optionGroups={(groups as OptionGroup[]) ?? []}
-      options={filteredOptions as Option[]}
+      vendor={vendor}
+      categories={categories}
+      items={items}
+      optionGroups={optionGroups}
+      options={options}
     />
   )
 }
