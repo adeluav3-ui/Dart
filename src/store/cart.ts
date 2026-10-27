@@ -8,6 +8,7 @@ interface CartStore {
   cart: Cart | null
   addItem: (
     vendorId: string,
+    vendorSlug: string,
     vendorName: string,
     vendorZoneId: string | null,
     item: MenuItem,
@@ -19,6 +20,7 @@ interface CartStore {
   clearCart: () => void
   confirmClearAndAdd: (
     vendorId: string,
+    vendorSlug: string,
     vendorName: string,
     vendorZoneId: string | null,
     item: MenuItem,
@@ -43,7 +45,7 @@ export const useCart = create<CartStore>()(
     (set, get) => ({
       cart: null,
 
-      addItem(vendorId, vendorName, vendorZoneId, item, qty, selectedOptions) {
+      addItem(vendorId, vendorSlug, vendorName, vendorZoneId, item, qty, selectedOptions) {
         const { cart } = get()
         if (cart && cart.vendorId !== vendorId) return 'conflict'
 
@@ -53,6 +55,7 @@ export const useCart = create<CartStore>()(
         set(state => ({
           cart: {
             vendorId,
+            vendorSlug,
             vendorName,
             vendorZoneId,
             items: [...(state.cart?.items ?? []), newItem],
@@ -93,12 +96,16 @@ export const useCart = create<CartStore>()(
         set({ cart: null })
       },
 
-      confirmClearAndAdd(vendorId, vendorName, vendorZoneId, item, qty, selectedOptions) {
+      confirmClearAndAdd(vendorId, vendorSlug, vendorName, vendorZoneId, item, qty, selectedOptions) {
         set({ cart: null })
-        get().addItem(vendorId, vendorName, vendorZoneId, item, qty, selectedOptions)
+        get().addItem(vendorId, vendorSlug, vendorName, vendorZoneId, item, qty, selectedOptions)
       },
     }),
-    { name: 'dart-cart' }
+    {
+      name: 'dart-cart',
+      version: 2,
+      migrate: () => ({ cart: null }),
+    }
   )
 )
 

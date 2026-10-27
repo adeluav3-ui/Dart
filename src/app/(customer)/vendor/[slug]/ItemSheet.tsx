@@ -64,6 +64,7 @@ export function ItemSheet({ item, vendor, optionGroups, options, onClose }: Prop
   function handleAdd() {
     const result = addItem(
       vendor.id,
+      vendor.slug,
       vendor.name,
       vendor.zone_id,
       item,
@@ -80,6 +81,7 @@ export function ItemSheet({ item, vendor, optionGroups, options, onClose }: Prop
   function handleConfirmClear() {
     confirmClearAndAdd(
       vendor.id,
+      vendor.slug,
       vendor.name,
       vendor.zone_id,
       item,

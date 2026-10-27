@@ -99,7 +99,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
   return (
     <div className="min-h-screen bg-canvas flex flex-col font-body text-ink">
       <header className="flex items-center gap-2 px-4 pt-4 pb-2 bg-canvas">
-        <Link href={`/vendor/${cart.vendorId}`} aria-label="Back" className="w-11 h-11 flex items-center justify-center">
+        <Link href={`/vendor/${cart.vendorSlug}`} aria-label="Back" className="w-11 h-11 flex items-center justify-center">
           <ArrowLeft size={22} strokeWidth={2.2} />
         </Link>
         <h1 className="font-heading font-extrabold text-2xl">Checkout</h1>
@@ -110,7 +110,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
         <section className="bg-white rounded-2xl p-4">
           <div className="flex justify-between items-baseline">
             <h2 className="text-[15px] font-bold">{cart.vendorName}</h2>
-            <Link href={`/vendor/${cart.vendorId}`} className="text-[13px] font-semibold text-brand no-underline">Add items</Link>
+            <Link href={`/vendor/${cart.vendorSlug}`} className="text-[13px] font-semibold text-brand no-underline">Add items</Link>
           </div>
           <div className="flex flex-col gap-3 mt-3">
             {cart.items.map((ci, i) => (
