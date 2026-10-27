@@ -60,5 +60,5 @@ export default async function WalletPage() {
     return sum
   }, 0)
 
-  return <WalletClient userId={user.id} balance={balance} entries={entries} />
+  return <WalletClient balance={balance} entries={entries} />
 }
