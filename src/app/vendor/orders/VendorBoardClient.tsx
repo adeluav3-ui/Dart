@@ -188,6 +188,11 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
     await supabase.from('vendors').update({ is_open: newOpen }).eq('id', vendor.id)
   }
 
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
   async function submitForReview() {
     await fetch('/api/vendor/submit-for-review', {
       method: 'POST',
@@ -247,22 +252,51 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
         </div>
       )}
 
-      <header className="px-4 pt-4.5 pb-3 bg-ink text-white flex items-center justify-between">
-        <span className="flex flex-col">
-          <span className="text-xs text-[#B9BEC4]">Vendor dashboard</span>
-          <span className="font-heading font-extrabold text-xl">{vendor.name}</span>
-        </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={isOpen}
-          aria-label="Taking orders"
-          onClick={toggleOpen}
-          className={`flex items-center gap-2 h-10 pl-3 pr-1.5 rounded-full border-0 font-body text-[13px] font-bold text-white transition-colors ${isOpen ? 'bg-brand' : 'bg-[#3A3D42]'}`}
-        >
-          {isOpen ? 'Open' : 'Closed'}
-          <span className="w-7 h-7 rounded-full bg-white" />
-        </button>
+      <header
+        className="bg-ink text-white px-4 pb-4"
+        style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}
+      >
+        {/* Top row: name + sign out */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] text-[#B9BEC4] font-medium tracking-wide uppercase">Vendor dashboard</span>
+            <span className="font-heading font-extrabold text-xl leading-tight">{vendor.name}</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Sign out"
+            onClick={handleSignOut}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#2A2D31] text-[#B9BEC4] hover:text-white transition-colors border-0 shrink-0"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Open / closed toggle row */}
+        <div className="flex items-center justify-between bg-[#23262B] rounded-2xl px-4 py-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-bold text-white">Taking orders</span>
+            <span className="text-xs text-[#B9BEC4]">
+              {isOpen ? 'Customers can place orders' : 'Shop is currently closed'}
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isOpen}
+            aria-label={isOpen ? 'Close shop' : 'Open shop'}
+            onClick={toggleOpen}
+            className={`relative w-12 h-7 rounded-full transition-colors border-0 cursor-pointer shrink-0 ${isOpen ? 'bg-brand' : 'bg-[#4A4E54]'}`}
+          >
+            <span
+              className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-200 ${isOpen ? 'left-[22px]' : 'left-0.5'}`}
+            />
+          </button>
+        </div>
       </header>
 
       {/* Setup checklist (shown while not verified) */}
