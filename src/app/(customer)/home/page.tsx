@@ -8,11 +8,13 @@ export default async function HomePage() {
   const supabase = createClient()
 
   const [
+    { data: { user } },
     { data: vendors },
     { data: zones },
     { data: areas },
     { data: zoneFares },
   ] = await Promise.all([
+    supabase.auth.getUser(),
     supabase
       .from('vendors')
       .select('*')
@@ -26,6 +28,7 @@ export default async function HomePage() {
 
   return (
     <HomeClient
+      userId={user?.id ?? null}
       vendors={(vendors as Vendor[]) ?? []}
       zones={(zones as Zone[]) ?? []}
       areas={(areas as Area[]) ?? []}

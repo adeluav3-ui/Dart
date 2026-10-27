@@ -11,7 +11,7 @@ import { formatMoney } from '@/lib/format'
 import { useCart, cartItemCount, cartSubtotal } from '@/store/cart'
 import type { Vendor, Zone, Area, ZoneFare, VendorType } from '@/types/database'
 
-const AREA_KEY = 'dart_area_id'
+const areaKey = (userId: string | null) => `dart_area_${userId ?? 'guest'}`
 
 const STORE_TYPES: { label: string; value: VendorType | 'all' }[] = [
   { label: 'Food', value: 'restaurant' },
@@ -22,13 +22,14 @@ const STORE_TYPES: { label: string; value: VendorType | 'all' }[] = [
 const FOOD_CATEGORIES = ['All', 'Rice', 'Swallow', 'Grills', 'Snacks', 'Drinks']
 
 interface Props {
+  userId: string | null
   vendors: Vendor[]
   zones: Zone[]
   areas: Area[]
   zoneFares: ZoneFare[]
 }
 
-export function HomeClient({ vendors, zones, areas, zoneFares }: Props) {
+export function HomeClient({ userId, vendors, zones, areas, zoneFares }: Props) {
   const [storeType, setStoreType] = useState<VendorType | 'all'>('restaurant')
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
@@ -39,17 +40,17 @@ export function HomeClient({ vendors, zones, areas, zoneFares }: Props) {
 
   // Hydrate area from localStorage; open picker if none selected
   useEffect(() => {
-    const saved = localStorage.getItem(AREA_KEY)
+    const saved = localStorage.getItem(areaKey(userId))
     if (saved && areas.some(a => a.id === saved && a.status === 'active')) {
       setAreaId(saved)
     } else if (areas.length > 0) {
       setPickerOpen(true)
     }
-  }, [areas])
+  }, [areas, userId])
 
   function saveArea(id: string) {
     setAreaId(id)
-    localStorage.setItem(AREA_KEY, id)
+    localStorage.setItem(areaKey(userId), id)
     setPickerOpen(false)
   }
 

@@ -11,18 +11,20 @@ import { Button } from '@/components/ui/Button'
 import type { Zone, ZoneFare, Area } from '@/types/database'
 
 interface Props {
+  userId: string | null
   zones: Zone[]
   areas: Area[]
   fares: ZoneFare[]
 }
 
-export function CheckoutClient({ zones, areas, fares }: Props) {
+export function CheckoutClient({ userId, zones, areas, fares }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
 
+  const areaKey = `dart_area_${userId ?? 'guest'}`
   const [customerAreaId, setCustomerAreaId] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem('dart_area_id') ?? '' : '')
+    () => (typeof window !== 'undefined' ? localStorage.getItem(`dart_area_${userId ?? 'guest'}`) ?? '' : '')
   )
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
@@ -132,7 +134,7 @@ export function CheckoutClient({ zones, areas, fares }: Props) {
               value={customerAreaId}
               onChange={e => {
                 setCustomerAreaId(e.target.value)
-                localStorage.setItem('dart_area_id', e.target.value)
+                localStorage.setItem(areaKey, e.target.value)
               }}
               className="h-btn-sm px-3 rounded-xl border border-line bg-white font-body text-[15px] text-ink font-medium"
             >
