@@ -65,6 +65,10 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
   const [name, setName] = useState(item?.name ?? '')
   const [description, setDescription] = useState(item?.description ?? '')
   const [categoryId, setCategoryId] = useState(item?.category_id ?? categories[0]?.id ?? '')
+  const [localCategories, setLocalCategories] = useState(categories)
+  const [creatingCat, setCreatingCat] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [savingCat, setSavingCat] = useState(false)
   const [priceStr, setPriceStr] = useState(item?.base_price ? String(item.base_price / 100) : '')
   const [packSize, setPackSize] = useState(item?.pack_size ?? '')
   const [photoUrl, setPhotoUrl] = useState<string | null>(item?.photo_url ?? null)
@@ -77,6 +81,23 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
   const isLive = item?.status === 'live'
   const priceKobo = Math.round(parseFloat(priceStr || '0') * 100)
   const valid = name.trim().length > 0
+
+  async function createCategory() {
+    const name = newCatName.trim()
+    if (!name) { setCreatingCat(false); return }
+    setSavingCat(true)
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .insert({ vendor_id: vendor.id, name, sort_order: localCategories.length })
+      .select()
+      .single()
+    setSavingCat(false)
+    if (error || !data) return
+    setLocalCategories(prev => [...prev, data])
+    setCategoryId(data.id)
+    setNewCatName('')
+    setCreatingCat(false)
+  }
 
   async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -327,16 +348,58 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
         {/* Category */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-bold">Category</label>
-          <select
-            value={categoryId}
-            onChange={e => setCategoryId(e.target.value)}
-            className="h-12 px-4 rounded-2xl border border-line bg-white text-sm font-body"
-          >
-            <option value="">No category</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
+          {creatingCat ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') createCategory()
+                  if (e.key === 'Escape') { setCreatingCat(false); setNewCatName('') }
+                }}
+                placeholder="Category name"
+                disabled={savingCat}
+                className="flex-1 h-12 px-4 rounded-2xl border-2 border-brand bg-white text-sm font-body focus:outline-none disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={createCategory}
+                disabled={savingCat || !newCatName.trim()}
+                className="h-12 px-4 rounded-2xl bg-brand text-white text-sm font-bold border-0 disabled:opacity-50"
+              >
+                {savingCat ? '…' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreatingCat(false); setNewCatName('') }}
+                className="h-12 px-4 rounded-2xl border border-line bg-white text-sm font-bold text-ink-2"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <select
+                value={categoryId}
+                onChange={e => setCategoryId(e.target.value)}
+                className="flex-1 h-12 px-4 rounded-2xl border border-line bg-white text-sm font-body"
+              >
+                <option value="">No category</option>
+                {localCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setCreatingCat(true)}
+                className="h-12 px-4 rounded-2xl border border-dashed border-line bg-white text-sm font-semibold text-ink-2 whitespace-nowrap hover:border-brand hover:text-brand transition-colors"
+              >
+                + New
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Price */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -34,7 +34,23 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
   const [activeCategory, setActiveCategory] = useState<string>(
     initialCategories[0]?.id ?? '__all__'
   )
+  // Category add / rename state
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [savingCat, setSavingCat] = useState(false)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const newCatInputRef = useRef<HTMLInputElement>(null)
+  const renameInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
+
+  useEffect(() => {
+    if (addingCategory) newCatInputRef.current?.focus()
+  }, [addingCategory])
+
+  useEffect(() => {
+    if (renamingId) renameInputRef.current?.focus()
+  }, [renamingId])
 
   const draftCount = items.filter(i => i.status === 'draft').length
   const rejectedCount = items.filter(i => i.status === 'rejected').length
@@ -43,6 +59,38 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
   const catItems = activeCategory === '__all__'
     ? items
     : items.filter(i => i.category_id === activeCategory)
+
+  async function addCategory() {
+    const name = newCatName.trim()
+    if (!name) { setAddingCategory(false); return }
+    setSavingCat(true)
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .insert({ vendor_id: vendor.id, name, sort_order: categories.length })
+      .select()
+      .single()
+    setSavingCat(false)
+    if (error || !data) return
+    setCategories(prev => [...prev, data])
+    setActiveCategory(data.id)
+    setNewCatName('')
+    setAddingCategory(false)
+  }
+
+  async function renameCategory(id: string) {
+    const name = renameValue.trim()
+    if (!name) { setRenamingId(null); return }
+    await supabase.from('menu_categories').update({ name }).eq('id', id)
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c))
+    setRenamingId(null)
+  }
+
+  async function deleteCategory(id: string) {
+    if (items.some(i => i.category_id === id)) return
+    await supabase.from('menu_categories').delete().eq('id', id)
+    setCategories(prev => prev.filter(c => c.id !== id))
+    if (activeCategory === id) setActiveCategory('__all__')
+  }
 
   async function toggleSoldOut(item: MenuItem) {
     const next = !item.is_sold_out
@@ -87,8 +135,9 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
         </div>
       )}
 
-      {/* Category chips */}
-      <div className="flex gap-2 px-4 pt-3 overflow-x-auto scrollbar-hide">
+      {/* Category chips + management */}
+      <div className="flex gap-2 px-4 pt-3 pb-1 overflow-x-auto scrollbar-hide items-center">
+        {/* All */}
         <button
           type="button"
           onClick={() => setActiveCategory('__all__')}
@@ -100,20 +149,103 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
         >
           All · {items.length}
         </button>
-        {categories.map(cat => (
+
+        {categories.map(cat => {
+          const isActive = activeCategory === cat.id
+          const isEmpty = !items.some(i => i.category_id === cat.id)
+          const isRenaming = renamingId === cat.id
+
+          if (isRenaming) {
+            return (
+              <div key={cat.id} className="flex items-center gap-1 flex-none">
+                <input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  onBlur={() => renameCategory(cat.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') renameCategory(cat.id)
+                    if (e.key === 'Escape') setRenamingId(null)
+                  }}
+                  className="h-9 px-3 rounded-full border-2 border-brand text-sm font-semibold bg-white focus:outline-none w-28"
+                />
+              </div>
+            )
+          }
+
+          return (
+            <div key={cat.id} className="flex items-center gap-1 flex-none">
+              <button
+                type="button"
+                onClick={() => setActiveCategory(cat.id)}
+                className={`h-9 px-4 rounded-full text-sm font-semibold border transition-colors whitespace-nowrap ${
+                  isActive
+                    ? 'bg-ink text-white border-transparent'
+                    : 'bg-white border-line text-ink'
+                }`}
+              >
+                {cat.name} · {itemCountFor(cat.id)}
+              </button>
+              {/* Edit/delete controls — always show small icon */}
+              <button
+                type="button"
+                aria-label={`Rename ${cat.name}`}
+                onClick={() => { setRenamingId(cat.id); setRenameValue(cat.name) }}
+                className="w-6 h-6 flex items-center justify-center rounded-full bg-surface text-ink-2 hover:bg-line shrink-0"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+              {isEmpty && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${cat.name}`}
+                  onClick={() => deleteCategory(cat.id)}
+                  className="w-6 h-6 flex items-center justify-center rounded-full bg-surface text-ink-2 hover:bg-red-50 hover:text-danger shrink-0"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Add new category */}
+        {addingCategory ? (
+          <div className="flex items-center gap-1 flex-none">
+            <input
+              ref={newCatInputRef}
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onBlur={addCategory}
+              onKeyDown={e => {
+                if (e.key === 'Enter') addCategory()
+                if (e.key === 'Escape') { setAddingCategory(false); setNewCatName('') }
+              }}
+              placeholder="Category name"
+              disabled={savingCat}
+              className="h-9 px-3 rounded-full border-2 border-brand text-sm font-semibold bg-white focus:outline-none w-36 disabled:opacity-50"
+            />
+          </div>
+        ) : (
           <button
-            key={cat.id}
             type="button"
-            onClick={() => setActiveCategory(cat.id)}
-            className={`flex-none h-9 px-4 rounded-full text-sm font-semibold border transition-colors whitespace-nowrap ${
-              activeCategory === cat.id
-                ? 'bg-ink text-white border-transparent'
-                : 'bg-white border-line text-ink'
-            }`}
+            onClick={() => setAddingCategory(true)}
+            className="flex-none h-9 px-3 rounded-full text-sm font-semibold border border-dashed border-line text-ink-2 flex items-center gap-1.5 whitespace-nowrap hover:border-brand hover:text-brand transition-colors"
           >
-            {cat.name} · {itemCountFor(cat.id)}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Category
           </button>
-        ))}
+        )}
       </div>
 
       {/* Items list */}
