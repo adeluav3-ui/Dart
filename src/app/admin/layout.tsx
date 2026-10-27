@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { AdminSignOut } from './AdminSignOut'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -19,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-canvas font-body text-ink flex flex-col">
       <header className="bg-ink text-white px-5 py-3 flex items-center justify-between">
         <span className="font-heading font-extrabold text-xl">Dart Admin</span>
-        <span className="text-xs text-[#B9BEC4]">Admin panel</span>
+        <AdminSignOut />
       </header>
 
       {/* Side nav — horizontal scroll on mobile */}
