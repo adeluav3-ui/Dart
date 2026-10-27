@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartSubtotal } from '@/store/cart'
 import { Button } from '@/components/ui/Button'
 import type { Zone, ZoneFare, Area } from '@/types/database'
@@ -189,7 +189,7 @@ export function CheckoutClient({ userId, zones, areas, fares }: Props) {
           <h2 className="text-[15px] font-bold mb-1">Summary</h2>
           <div className="flex justify-between text-sm"><span className="text-ink-2">Food</span><span>{formatMoney(subtotal)}</span></div>
           <div className="flex justify-between text-sm">
-            <span className="text-ink-2">Delivery{selectedArea ? ` · ${selectedArea.name}` : ''}</span>
+            <span className="text-ink-2">Delivery{selectedArea ? ` · ${areaDisplayName(selectedArea)}` : ''}</span>
             <span>{deliveryFee > 0 ? formatMoney(deliveryFee) : customerZoneId ? 'Free' : '—'}</span>
           </div>
           <div className="flex justify-between text-sm"><span className="text-ink-2">Service fee</span><span>{serviceFee > 0 ? formatMoney(serviceFee) : '—'}</span></div>

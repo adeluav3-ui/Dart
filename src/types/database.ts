@@ -103,6 +103,7 @@ export interface Area {
   id: string
   zone_id: string | null
   name: string
+  district: string | null
   aliases: string[]
   lat: number | null
   lng: number | null

@@ -42,3 +42,8 @@ export function isValidNigerianPhone(raw: string): boolean {
   const normalised = normalisePhone(raw)
   return /^\+234[789][01]\d{8}$/.test(normalised)
 }
+
+/** "Mosque junction, Ayepe" or just "Mosque junction" when no district */
+export function areaDisplayName(area: { name: string; district: string | null }): string {
+  return area.district ? `${area.name}, ${area.district}` : area.name
+}

@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { X, Search, Navigation } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
+import { areaDisplayName } from '@/lib/format'
 import type { Area, Zone } from '@/types/database'
 
 interface Props {
@@ -48,7 +49,6 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   const [search, setSearch] = useState('')
   const [locating, setLocating] = useState(false)
   const [locError, setLocError] = useState('')
-  // waitlistArea: '' = custom, non-empty string = pre-filled from coming-soon tap
   const [waitlistArea, setWaitlistArea] = useState<string | null>(null)
   const [waitlistAreaName, setWaitlistAreaName] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
@@ -59,25 +59,42 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
 
   const normalizedSearch = normalizeText(search)
   const zoneMap = Object.fromEntries(zones.map(z => [z.id, z]))
+  const isSearching = !!normalizedSearch
 
   const filtered = areas.filter(a => {
     if (!normalizedSearch) return true
     return (
       normalizeText(a.name).includes(normalizedSearch) ||
+      normalizeText(a.district ?? '').includes(normalizedSearch) ||
       a.aliases.some(alias => normalizeText(alias).includes(normalizedSearch))
     )
   })
 
-  type Group = { zoneId: string | null; zoneName: string; areas: Area[] }
-  const groups: Group[] = []
-  const seen = new Set<string | null>()
+  // Build zone → district → areas hierarchy
+  type DistrictGroup = { district: string | null; areas: Area[] }
+  type ZoneGroup = { zoneId: string | null; zoneName: string; districtGroups: DistrictGroup[] }
+
+  const zoneGroups: ZoneGroup[] = []
+  const seenZones = new Set<string | null>()
   for (const a of filtered) {
-    if (!seen.has(a.zone_id)) {
-      seen.add(a.zone_id)
-      groups.push({
+    if (!seenZones.has(a.zone_id)) {
+      seenZones.add(a.zone_id)
+      const zoneAreas = filtered.filter(x => x.zone_id === a.zone_id)
+      const districtGroups: DistrictGroup[] = []
+      const seenDistricts = new Set<string | null>()
+      for (const za of zoneAreas) {
+        if (!seenDistricts.has(za.district)) {
+          seenDistricts.add(za.district)
+          districtGroups.push({
+            district: za.district,
+            areas: zoneAreas.filter(x => x.district === za.district),
+          })
+        }
+      }
+      zoneGroups.push({
         zoneId: a.zone_id,
         zoneName: a.zone_id ? (zoneMap[a.zone_id]?.name ?? 'Other') : 'Coming Soon',
-        areas: filtered.filter(x => x.zone_id === a.zone_id),
+        districtGroups,
       })
     }
   }
@@ -97,24 +114,22 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
           if (dist < nearestDist) { nearestDist = dist; nearest = a }
         }
 
-        if (!nearest || nearestDist > 15) {
-          // Outside all known areas — reverse-geocode to get their actual place name
+        if (!nearest || nearestDist > 2) {
           const detected = await reverseGeocode(lat, lng)
           setLocating(false)
           openWaitlist(detected)
           setLocError(
             detected
-              ? `We don't deliver to ${detected} yet. Join the waitlist and we'll notify you when we start.`
-              : 'We don\'t deliver to your area yet. Tell us where you are and we\'ll notify you.'
+              ? `We don't deliver to ${detected} yet. Join the waitlist and we'll notify you.`
+              : "We don't deliver to your area yet. Tell us where you are."
           )
         } else if (nearest.status === 'active') {
           setLocating(false)
           setSelected(nearest.id)
         } else {
-          // In a coming-soon area
           setLocating(false)
-          openWaitlist(nearest.name)
-          setLocError(`We don't deliver to ${nearest.name} yet — join the waitlist below.`)
+          openWaitlist(areaDisplayName(nearest))
+          setLocError(`We don't deliver to ${areaDisplayName(nearest)} yet — join the waitlist below.`)
         }
       },
       err => {
@@ -133,7 +148,6 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
     setWaitlistArea(prefilledName ?? '')
     setWaitlistAreaName(prefilledName ?? '')
     setWaitlistSent(false)
-    // scroll to waitlist form
     setTimeout(() => waitlistRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
@@ -153,17 +167,15 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   function handleContinue() {
     const area = areas.find(a => a.id === selected && a.status === 'active')
     if (!area) return
-    onSave(selected, area.name)
+    onSave(selected, areaDisplayName(area))
   }
 
   const canContinue = !!areas.find(a => a.id === selected && a.status === 'active')
 
   return (
     <>
-      {/* Backdrop — z-[60] covers BottomNav (z-50) */}
       <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
 
-      {/* Sheet */}
       <div
         className="fixed inset-x-0 bottom-0 z-[60] bg-white rounded-t-3xl max-w-md mx-auto flex flex-col"
         style={{ maxHeight: '88dvh', paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -172,11 +184,8 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <span className="font-heading font-bold text-[17px]">Choose your area</span>
           {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-surface"
-            >
+            <button type="button" onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-surface">
               <X size={16} />
             </button>
           )}
@@ -206,7 +215,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
             <Search size={14} stroke="#5B6168" />
             <input
               type="search"
-              placeholder="Search areas…"
+              placeholder="Search areas or districts…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-[14px] font-body text-ink outline-none placeholder:text-ink-2/60"
@@ -216,59 +225,84 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
 
         {/* Area list */}
         <div className="flex-1 overflow-y-auto px-4">
-          {groups.length === 0 && (
+          {zoneGroups.length === 0 && (
             <p className="text-sm text-ink-2 text-center py-6">No areas match your search</p>
           )}
 
-          {groups.map(group => (
-            <div key={group.zoneId ?? '__coming_soon'} className="mb-3">
+          {zoneGroups.map(zoneGroup => (
+            <div key={zoneGroup.zoneId ?? '__coming_soon'} className="mb-3">
+              {/* Zone header */}
               <p className="text-[11px] font-bold text-ink-2 uppercase tracking-wide px-1 mb-1">
-                {group.zoneName}
+                {zoneGroup.zoneName}
               </p>
-              {group.areas.map(area => {
-                const isComing = area.status === 'coming_soon'
-                const isSelected = area.id === selected
-                return (
-                  <button
-                    key={area.id}
-                    type="button"
-                    onClick={() => {
-                      if (isComing) {
-                        openWaitlist(area.name)
-                      } else {
-                        setSelected(area.id)
-                      }
-                    }}
-                    className={`flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-left mb-1 transition-colors ${
-                      isComing
-                        ? 'hover:bg-surface active:bg-surface'
-                        : isSelected
-                        ? 'bg-brand-tint'
-                        : 'hover:bg-surface active:bg-surface'
-                    }`}
-                  >
-                    <span className={`text-[15px] font-medium ${isComing ? 'text-ink-2' : 'text-ink'}`}>
-                      {area.name}
-                    </span>
-                    <span className="flex items-center gap-2 shrink-0">
-                      {isComing && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface text-ink-2">
-                          Notify me
+
+              {zoneGroup.districtGroups.map(dg => (
+                <div key={dg.district ?? '__no_district'}>
+                  {/* District sub-header (only when not searching — searching shows display name inline) */}
+                  {dg.district && !isSearching && (
+                    <p className="text-[12px] font-semibold text-ink-2 px-2 pt-1 pb-0.5">
+                      {dg.district}
+                    </p>
+                  )}
+
+                  {dg.areas.map(area => {
+                    const isComing = area.status === 'coming_soon'
+                    const isSelected = area.id === selected
+                    // When searching, show full "Area, District"; when browsing under heading, just name
+                    const label = (isSearching && area.district)
+                      ? areaDisplayName(area)
+                      : area.name
+
+                    return (
+                      <button
+                        key={area.id}
+                        type="button"
+                        onClick={() => {
+                          if (isComing) {
+                            openWaitlist(areaDisplayName(area))
+                          } else {
+                            setSelected(area.id)
+                          }
+                        }}
+                        className={`flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-left mb-1 transition-colors ${
+                          dg.district && !isSearching ? 'pl-6' : ''
+                        } ${
+                          isComing
+                            ? 'hover:bg-surface active:bg-surface'
+                            : isSelected
+                            ? 'bg-brand-tint'
+                            : 'hover:bg-surface active:bg-surface'
+                        }`}
+                      >
+                        <span className={`text-[15px] font-medium ${isComing ? 'text-ink-2' : 'text-ink'}`}>
+                          {label}
                         </span>
-                      )}
-                      {isSelected && !isComing && (
-                        <span className="w-5 h-5 rounded-full bg-brand flex items-center justify-center">
-                          <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
-                            <path d="M1 4.5L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                        <span className="flex items-center gap-2 shrink-0">
+                          {isComing && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface text-ink-2">
+                              Notify me
+                            </span>
+                          )}
+                          {isSelected && !isComing && (
+                            <span className="w-5 h-5 rounded-full bg-brand flex items-center justify-center">
+                              <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                                <path d="M1 4.5L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                  </button>
-                )
-              })}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           ))}
+
+          {/* Hint text */}
+          <p className="text-[13px] text-ink-2 text-center px-2 py-3">
+            Not sure? Pick the place closest to you — your rider will call if needed.
+          </p>
 
           {/* Waitlist section */}
           <div ref={waitlistRef} className="mb-4 mt-1">
@@ -294,11 +328,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
                       ? `Join waitlist for ${waitlistArea}`
                       : "We'll expand when there's enough demand"}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setWaitlistArea(null)}
-                    className="text-ink-2"
-                  >
+                  <button type="button" onClick={() => setWaitlistArea(null)} className="text-ink-2">
                     <X size={14} />
                   </button>
                 </div>

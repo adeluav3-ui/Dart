@@ -9,6 +9,7 @@ import type { Area, Zone, AreaRequest } from '@/types/database'
 
 type EditState = {
   name: string
+  district: string
   zone_id: string
   aliases: string
   lat: string
@@ -16,7 +17,7 @@ type EditState = {
   status: 'active' | 'coming_soon'
 }
 
-const EMPTY_EDIT: EditState = { name: '', zone_id: '', aliases: '', lat: '', lng: '', status: 'active' }
+const EMPTY_EDIT: EditState = { name: '', district: '', zone_id: '', aliases: '', lat: '', lng: '', status: 'active' }
 
 export default function AdminAreasPage() {
   const [areas, setAreas] = useState<Area[]>([])
@@ -26,6 +27,7 @@ export default function AdminAreasPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [locating, setLocating] = useState(false)
+  const [districtFilter, setDistrictFilter] = useState<string>('__all__')
   const supabase = createClient()
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export default function AdminAreasPage() {
     setEditingId(area.id)
     setEdit({
       name: area.name,
+      district: area.district ?? '',
       zone_id: area.zone_id ?? '',
       aliases: area.aliases.join(', '),
       lat: area.lat != null ? String(area.lat) : '',
@@ -56,7 +59,7 @@ export default function AdminAreasPage() {
     setEdit(EMPTY_EDIT)
   }
 
-  function detectLocation() {
+  function useCurrentLocation() {
     if (!navigator.geolocation) return
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
@@ -83,6 +86,7 @@ export default function AdminAreasPage() {
 
     const payload = {
       name: edit.name.trim(),
+      district: edit.district.trim() || null,
       zone_id: edit.zone_id || null,
       aliases: parseAliases(edit.aliases),
       lat: edit.lat ? parseFloat(edit.lat) : null,
@@ -103,14 +107,25 @@ export default function AdminAreasPage() {
   }
 
   const zoneMap = Object.fromEntries(zones.map(z => [z.id, z]))
+
+  // All unique district values for the filter
+  const allDistricts = Array.from(
+    new Set(areas.map(a => a.district).filter((d): d is string => !!d))
+  ).sort()
+
+  // Apply district filter then group by zone
+  const visibleAreas = districtFilter === '__all__'
+    ? areas
+    : areas.filter(a => a.district === districtFilter)
+
   const areasByZone: { zone: Zone | null; areas: Area[] }[] = []
   const seen = new Set<string | null>()
-  for (const a of areas) {
+  for (const a of visibleAreas) {
     if (!seen.has(a.zone_id)) {
       seen.add(a.zone_id)
       areasByZone.push({
         zone: a.zone_id ? (zoneMap[a.zone_id] ?? null) : null,
-        areas: areas.filter(x => x.zone_id === a.zone_id),
+        areas: visibleAreas.filter(x => x.zone_id === a.zone_id),
       })
     }
   }
@@ -126,7 +141,21 @@ export default function AdminAreasPage() {
       {editingId && (
         <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
           <h3 className="font-bold text-sm">{editingId === '__new__' ? 'New area' : 'Edit area'}</h3>
-          <Input label="Name" placeholder="e.g. OOUTH and hospital road" value={edit.name} onChange={e => setEdit(p => ({ ...p, name: e.target.value }))} />
+
+          <Input
+            label="Area name"
+            placeholder="e.g. Mosque junction"
+            value={edit.name}
+            onChange={e => setEdit(p => ({ ...p, name: e.target.value }))}
+          />
+
+          <Input
+            label="District (optional)"
+            placeholder="e.g. Ayepe — groups areas under a heading"
+            value={edit.district}
+            onChange={e => setEdit(p => ({ ...p, district: e.target.value }))}
+          />
+
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Zone
             <select
@@ -138,36 +167,53 @@ export default function AdminAreasPage() {
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
           </label>
+
           <Input
             label="Aliases (comma-separated, lowercase)"
-            placeholder="oouth, hospital road"
+            placeholder="mosque, junction"
             value={edit.aliases}
             onChange={e => setEdit(p => ({ ...p, aliases: e.target.value }))}
           />
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Input label="Latitude" placeholder="e.g. 6.9667" value={edit.lat} onChange={e => setEdit(p => ({ ...p, lat: e.target.value }))} />
+
+          {/* Lat / lng + location button */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-ink-2">Centre point</span>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                step="any"
+                placeholder="Latitude (e.g. 6.9667)"
+                value={edit.lat}
+                onChange={e => setEdit(p => ({ ...p, lat: e.target.value }))}
+                className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink"
+              />
+              <input
+                type="number"
+                step="any"
+                placeholder="Longitude (e.g. 3.6444)"
+                value={edit.lng}
+                onChange={e => setEdit(p => ({ ...p, lng: e.target.value }))}
+                className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink"
+              />
             </div>
-            <div className="flex-1">
-              <Input label="Longitude" placeholder="e.g. 3.6444" value={edit.lng} onChange={e => setEdit(p => ({ ...p, lng: e.target.value }))} />
-            </div>
-            <div className="flex items-end pb-0.5">
-              <button
-                type="button"
-                onClick={detectLocation}
-                disabled={locating}
-                title="Use current location"
-                className="h-btn-sm px-3 rounded-xl border border-line bg-white flex items-center gap-1.5 text-sm font-semibold text-brand disabled:opacity-50"
-              >
-                {locating ? (
-                  <span className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
-                ) : (
-                  <MapPin size={15} />
-                )}
-                Locate
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={useCurrentLocation}
+              disabled={locating}
+              className="h-10 w-full rounded-xl border border-brand bg-brand-tint text-brand flex items-center justify-center gap-2 text-sm font-semibold disabled:opacity-50"
+            >
+              {locating ? (
+                <span className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
+              ) : (
+                <MapPin size={15} />
+              )}
+              {locating ? 'Getting location…' : 'Use my current location'}
+            </button>
+            <p className="text-[11px] text-ink-2 px-0.5">
+              Stand in the centre of this area, then tap the button above to save the GPS pin.
+            </p>
           </div>
+
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Status
             <select
@@ -179,10 +225,38 @@ export default function AdminAreasPage() {
               <option value="coming_soon">Coming soon</option>
             </select>
           </label>
+
           <div className="flex gap-2 pt-1">
             <Button onClick={save} loading={saving} size="md">Save</Button>
             <Button onClick={cancelEdit} variant="ghost" size="md">Cancel</Button>
           </div>
+        </div>
+      )}
+
+      {/* District filter */}
+      {allDistricts.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setDistrictFilter('__all__')}
+            className={`h-8 px-3 rounded-full text-[13px] font-semibold transition-colors ${
+              districtFilter === '__all__' ? 'bg-brand text-white' : 'bg-white text-ink border border-line'
+            }`}
+          >
+            All
+          </button>
+          {allDistricts.map(d => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDistrictFilter(d)}
+              className={`h-8 px-3 rounded-full text-[13px] font-semibold transition-colors ${
+                districtFilter === d ? 'bg-brand text-white' : 'bg-white text-ink border border-line'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
         </div>
       )}
 
@@ -196,10 +270,15 @@ export default function AdminAreasPage() {
             {zoneAreas.map(area => (
               <div key={area.id} className="flex items-start gap-3 py-2 border-b border-line last:border-0">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[14px] font-semibold">{area.name}</span>
-                    {area.status === 'coming_soon' && (
+                    {area.district && (
                       <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface text-ink-2 font-semibold">
+                        {area.district}
+                      </span>
+                    )}
+                    {area.status === 'coming_soon' && (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-warn-tint text-warn font-semibold">
                         Coming soon
                       </span>
                     )}

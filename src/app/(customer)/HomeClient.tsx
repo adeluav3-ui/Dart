@@ -7,7 +7,7 @@ import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck } from 'l
 import { DartLogo } from '@/components/ui/DartLogo'
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
 import { AreaPicker } from '@/components/AreaPicker'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartItemCount, cartSubtotal } from '@/store/cart'
 import type { Vendor, Zone, Area, ZoneFare, VendorType } from '@/types/database'
 
@@ -115,7 +115,7 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares }: Props) 
             <span className="flex flex-col">
               <span className="text-[11px] text-ink-2">Deliver to</span>
               <span className="text-[14px] font-bold flex items-center gap-1">
-                {selectedArea?.name ?? 'Select area'}
+                {selectedArea ? areaDisplayName(selectedArea) : 'Select area'}
                 <ChevronDown size={13} strokeWidth={2.2} />
               </span>
             </span>
