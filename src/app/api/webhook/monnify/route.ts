@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     // 6. Email customer their PIN (fire-and-forget)
     const fullOrder = await admin
       .from('orders')
-      .select('code, delivery_pin, total, customer_id, vendor_id')
+      .select('code, delivery_pin, subtotal, delivery_fee, service_fee, total, customer_id, vendor_id')
       .eq('id', order.id)
       .single()
 
@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
           to: customerAuth.user.email,
           orderCode: fullOrder.data.code,
           deliveryPin: fullOrder.data.delivery_pin,
+          subtotal: fullOrder.data.subtotal,
+          deliveryFee: fullOrder.data.delivery_fee,
+          serviceFee: fullOrder.data.service_fee,
           total: fullOrder.data.total,
           orderId: order.id,
         }).catch(() => {})

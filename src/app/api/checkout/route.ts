@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { parseServiceFeeSettings, calcServiceFee } from '@/lib/serviceFee'
 import type { Cart, CartItem } from '@/types/database'
 
 export async function POST(req: NextRequest) {
@@ -128,7 +129,17 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4. Look up delivery fee via fare level
+    // 4. Load service fee settings
+    const { data: feeRows } = await admin
+      .from('app_settings')
+      .select('key, value')
+      .in('key', [
+        'service_fee_enabled', 'service_fee_type', 'service_fee_percent',
+        'service_fee_min', 'service_fee_max', 'service_fee_flat',
+      ])
+    const feeSettings = parseServiceFeeSettings(feeRows ?? [])
+
+    // 5. Look up delivery fee via fare level
     let deliveryFee = 0
     let riderPay = 0
 
@@ -147,14 +158,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const serviceFee = 0 // loaded from config table when admin sets it
+    const serviceFee = calcServiceFee(subtotal, feeSettings)
     const total = subtotal + deliveryFee + serviceFee
     const commissionAmount = Math.round(subtotal * vendor.commission_rate)
 
-    // 5. Generate delivery PIN
+    // 6. Generate delivery PIN
     const deliveryPin = String(Math.floor(1000 + Math.random() * 9000))
 
-    // 6. Create order
+    // 7. Create order
     const { data: order, error: orderErr } = await admin
       .from('orders')
       .insert({
@@ -186,12 +197,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
 
-    // 7. Insert order items
+    // 8. Insert order items
     await admin.from('order_items').insert(
       orderItems.map(oi => ({ ...oi, order_id: order.id }))
     )
 
-    // 8. Log initial event
+    // 9. Log initial event
     await admin.from('order_events').insert({
       order_id: order.id,
       from_status: null,
@@ -200,7 +211,7 @@ export async function POST(req: NextRequest) {
       note: 'Order created',
     })
 
-    // 9. Init Monnify payment
+    // 10. Init Monnify payment
     const reference = `DT-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
 
     await admin.from('payments').insert({

@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { ArrowLeft, Lock, Info } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartSubtotal } from '@/store/cart'
+import { calcServiceFee, type ServiceFeeSettings } from '@/lib/serviceFee'
 import { Button } from '@/components/ui/Button'
 import type { Zone, ZoneFare, Area, FareLevel } from '@/types/database'
 
@@ -16,9 +17,10 @@ interface Props {
   areas: Area[]
   fares: ZoneFare[]
   fareLevels: FareLevel[]
+  feeSettings: ServiceFeeSettings
 }
 
-export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Props) {
+export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSettings }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
@@ -32,6 +34,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [feeInfoOpen, setFeeInfoOpen] = useState(false)
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -43,7 +46,6 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
   }
 
   const subtotal = cartSubtotal(cart)
-
   const selectedArea = areas.find(a => a.id === customerAreaId)
   const customerZoneId = selectedArea?.zone_id ?? null
   const vendorZoneId = (cart as any).vendorZoneId ?? null
@@ -60,7 +62,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
     }
   }
 
-  const serviceFee = 0
+  const serviceFee = calcServiceFee(subtotal, feeSettings)
   const total = subtotal + deliveryFee + serviceFee
   const activeAreas = areas.filter(a => a.status === 'active')
 
@@ -197,14 +199,35 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
         {/* Fee summary */}
         <section className="bg-white rounded-2xl p-4 flex flex-col gap-2">
           <h2 className="text-[15px] font-bold mb-1">Summary</h2>
-          <div className="flex justify-between text-sm"><span className="text-ink-2">Food</span><span>{formatMoney(subtotal)}</span></div>
+          <div className="flex justify-between text-sm">
+            <span className="text-ink-2">Items</span>
+            <span>{formatMoney(subtotal)}</span>
+          </div>
           <div className="flex justify-between text-sm">
             <span className="text-ink-2">Delivery{selectedArea ? ` · ${areaDisplayName(selectedArea)}` : ''}</span>
             <span>{deliveryFee > 0 ? formatMoney(deliveryFee) : customerZoneId ? 'Free' : '—'}</span>
           </div>
-          <div className="flex justify-between text-sm"><span className="text-ink-2">Service fee</span><span>{serviceFee > 0 ? formatMoney(serviceFee) : '—'}</span></div>
+          <div className="flex justify-between text-sm items-center">
+            <button
+              type="button"
+              onClick={() => setFeeInfoOpen(p => !p)}
+              className="flex items-center gap-1 text-ink-2 bg-transparent border-0 cursor-pointer p-0"
+            >
+              Service fee
+              <Info size={13} strokeWidth={2} className="text-ink-2/60" />
+            </button>
+            <span>{serviceFee > 0 ? formatMoney(serviceFee) : '—'}</span>
+          </div>
+          {feeInfoOpen && (
+            <p className="text-[12px] text-ink-2 bg-surface rounded-xl px-3 py-2 leading-relaxed">
+              Helps us run Dart: payments, support and refunds.
+            </p>
+          )}
           <div className="h-px bg-line my-1" />
-          <div className="flex justify-between text-base font-bold"><span>Total</span><span>{formatMoney(total)}</span></div>
+          <div className="flex justify-between text-base font-bold">
+            <span>Total</span>
+            <span>{formatMoney(total)}</span>
+          </div>
         </section>
       </div>
 

@@ -20,15 +20,32 @@ export async function sendOrderPaidEmail({
   to,
   orderCode,
   deliveryPin,
+  subtotal,
+  deliveryFee,
+  serviceFee,
   total,
   orderId,
 }: {
   to: string
   orderCode: string
   deliveryPin: string
+  subtotal: number
+  deliveryFee: number
+  serviceFee: number
   total: number
   orderId: string
 }) {
+  const feeRows = [
+    `<tr><td style="padding:3px 0;color:#5B6168;font-size:13px">Items</td><td style="padding:3px 0;text-align:right;font-size:13px">${formatMoney(subtotal)}</td></tr>`,
+    deliveryFee > 0
+      ? `<tr><td style="padding:3px 0;color:#5B6168;font-size:13px">Delivery</td><td style="padding:3px 0;text-align:right;font-size:13px">${formatMoney(deliveryFee)}</td></tr>`
+      : '',
+    serviceFee > 0
+      ? `<tr><td style="padding:3px 0;color:#5B6168;font-size:13px">Service fee</td><td style="padding:3px 0;text-align:right;font-size:13px">${formatMoney(serviceFee)}</td></tr>`
+      : '',
+    `<tr style="border-top:1px solid #E6E8EB"><td style="padding:6px 0 0;font-weight:700;font-size:14px">Total paid</td><td style="padding:6px 0 0;text-align:right;font-weight:700;font-size:14px">${formatMoney(total)}</td></tr>`,
+  ].join('')
+
   await resend.emails.send({
     from: FROM,
     to,
@@ -38,7 +55,7 @@ export async function sendOrderPaidEmail({
       <p>Your order <strong>${orderCode}</strong> is confirmed.</p>
       <p>When your rider arrives, give them this PIN:</p>
       <div style="font-size:40px;font-weight:800;letter-spacing:8px;color:#0B7A47;margin:16px 0">${deliveryPin}</div>
-      <p style="color:#5B6168;font-size:14px">Total paid: ${formatMoney(total)}</p>
+      <table style="width:100%;border-collapse:collapse;margin:8px 0 16px">${feeRows}</table>
       ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/track/${orderId}`, 'Track your order')}
     `),
   })

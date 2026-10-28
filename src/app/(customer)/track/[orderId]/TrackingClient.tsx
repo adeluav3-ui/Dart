@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { X, Phone } from 'lucide-react'
+import { X, Phone, Info } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, formatMoney } from '@/lib/format'
 import type { Order, OrderEvent, OrderItem, OrderStatus } from '@/types/database'
@@ -30,6 +30,7 @@ interface Props {
 export function TrackingClient({ initialOrder, initialEvents, orderItems, isConfirmRedirect }: Props) {
   const [order, setOrder] = useState<Record<string, unknown>>(initialOrder)
   const [events, setEvents] = useState<OrderEvent[]>(initialEvents)
+  const [feeInfoOpen, setFeeInfoOpen] = useState(false)
   const supabase = createClient()
 
   const status = order.status as OrderStatus
@@ -198,9 +199,39 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
             <span className="font-semibold">{formatMoney(oi.line_total)}</span>
           </div>
         ))}
-        <div className="border-t border-line mt-1 pt-2 flex justify-between font-bold text-sm">
-          <span>Total</span>
-          <span>{formatMoney(order.total as number)}</span>
+        <div className="border-t border-line mt-1 pt-2 flex flex-col gap-1.5">
+          <div className="flex justify-between text-sm text-ink-2">
+            <span>Items</span>
+            <span>{formatMoney(order.subtotal as number)}</span>
+          </div>
+          {(order.delivery_fee as number) > 0 && (
+            <div className="flex justify-between text-sm text-ink-2">
+              <span>Delivery</span>
+              <span>{formatMoney(order.delivery_fee as number)}</span>
+            </div>
+          )}
+          {(order.service_fee as number) > 0 && (
+            <div className="flex justify-between text-sm text-ink-2 items-center">
+              <button
+                type="button"
+                onClick={() => setFeeInfoOpen(p => !p)}
+                className="flex items-center gap-1 bg-transparent border-0 cursor-pointer p-0 text-ink-2"
+              >
+                Service fee
+                <Info size={12} strokeWidth={2} className="opacity-60" />
+              </button>
+              <span>{formatMoney(order.service_fee as number)}</span>
+            </div>
+          )}
+          {feeInfoOpen && (
+            <p className="text-[11px] text-ink-2 bg-white rounded-lg px-2.5 py-1.5 leading-relaxed">
+              Helps us run Dart: payments, support and refunds.
+            </p>
+          )}
+          <div className="flex justify-between font-bold text-sm pt-1 border-t border-line">
+            <span>Total</span>
+            <span>{formatMoney(order.total as number)}</span>
+          </div>
         </div>
       </div>
 

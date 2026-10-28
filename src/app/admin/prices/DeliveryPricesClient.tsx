@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney, areaDisplayName } from '@/lib/format'
+import { calcServiceFee, type ServiceFeeSettings } from '@/lib/serviceFee'
 import type { Area, ZoneFare, FareLevel } from '@/types/database'
 
 interface LevelEdit {
@@ -21,9 +22,10 @@ interface Props {
   initialAreas: Area[]
   initialZoneFares: ZoneFare[]
   initialFareLevels: FareLevel[]
+  initialFeeSettings: ServiceFeeSettings
 }
 
-export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFareLevels }: Props) {
+export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFareLevels, initialFeeSettings }: Props) {
   const supabase = createClient()
   const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
@@ -39,6 +41,10 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
   const [levelErrors, setLevelErrors] = useState<string[]>([])
   const [checkFrom, setCheckFrom] = useState(activeAreas[0]?.id ?? '')
   const [checkTo, setCheckTo] = useState(activeAreas[1]?.id ?? '')
+  // "Check a price" item total (default ₦3,500)
+  const [checkItemTotal, setCheckItemTotal] = useState('3500')
+  // Default commission rate for the price check (10 %)
+  const [checkCommission, setCheckCommission] = useState('10')
 
   useEffect(() => () => {
     Object.values(toastTimers.current).forEach(clearTimeout)
@@ -373,29 +379,71 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
               </select>
             </label>
 
-            {checkFromArea && checkToArea && (
-              checkLevel ? (
+            <label className="flex flex-col gap-1 text-[12px] font-semibold text-ink-2">
+              Item total
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-2 text-[13px] pointer-events-none">₦</span>
+                <input
+                  type="number" min="0" step="100"
+                  value={checkItemTotal}
+                  onChange={e => setCheckItemTotal(e.target.value)}
+                  className="w-full h-10 pl-7 pr-3 rounded-xl border border-line font-body text-[14px] text-ink"
+                />
+              </div>
+            </label>
+
+            <label className="flex flex-col gap-1 text-[12px] font-semibold text-ink-2">
+              Commission %
+              <div className="relative">
+                <input
+                  type="number" min="0" max="50" step="1"
+                  value={checkCommission}
+                  onChange={e => setCheckCommission(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-2 text-[13px] pointer-events-none">%</span>
+              </div>
+            </label>
+
+            {checkFromArea && checkToArea && (() => {
+              if (!checkLevel) {
+                return (
+                  <div className="bg-warn-tint rounded-xl p-3">
+                    <p className="text-[13px] text-warn font-semibold">No price set for this route</p>
+                  </div>
+                )
+              }
+              const itemsKobo = Math.round(parseFloat(checkItemTotal || '0') * 100)
+              const commRate = parseFloat(checkCommission || '0') / 100
+              const serviceFee = calcServiceFee(itemsKobo, initialFeeSettings)
+              const commission = Math.round(itemsKobo * commRate)
+              const customerPays = itemsKobo + checkLevel.delivery_fee + serviceFee
+              const riderGets = checkLevel.rider_pay
+              const vendorGets = itemsKobo - commission
+              const dartKeeps = commission + serviceFee + Math.max(0, checkLevel.delivery_fee - riderGets)
+
+              return (
                 <div className="bg-brand-tint rounded-xl p-3 flex flex-col gap-1.5">
                   <p className="text-[13px] font-bold text-brand-ink capitalize">{checkLevel.name} trip</p>
                   <div className="flex items-center justify-between text-[13px]">
                     <span className="text-ink-2">Customer pays</span>
-                    <span className="font-bold text-ink">{formatMoney(checkLevel.delivery_fee)}</span>
+                    <span className="font-bold text-ink">{formatMoney(customerPays)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[13px]">
                     <span className="text-ink-2">Rider gets</span>
-                    <span className="font-bold text-ink">{formatMoney(checkLevel.rider_pay)}</span>
+                    <span className="font-bold text-ink">{formatMoney(riderGets)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-ink-2">Dart keeps</span>
-                    <span className="font-bold text-brand">{formatMoney(checkLevel.delivery_fee - checkLevel.rider_pay)}</span>
+                    <span className="text-ink-2">Vendor gets</span>
+                    <span className="font-bold text-ink">{formatMoney(vendorGets)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[13px] border-t border-brand/20 pt-1.5 mt-0.5">
+                    <span className="text-ink-2 font-semibold">Dart keeps</span>
+                    <span className="font-bold text-brand">{formatMoney(dartKeeps)}</span>
                   </div>
                 </div>
-              ) : (
-                <div className="bg-warn-tint rounded-xl p-3">
-                  <p className="text-[13px] text-warn font-semibold">No price set for this route</p>
-                </div>
               )
-            )}
+            })()}
           </div>
 
           {/* Price levels */}
