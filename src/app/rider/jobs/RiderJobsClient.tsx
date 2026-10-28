@@ -185,10 +185,27 @@ export function RiderJobsClient({ initialJobs, riderId, initialAvailable, locati
   const pickupJobs = jobs.filter(j => j.status === 'ready')
   const deliveryJobs = jobs.filter(j => j.status === 'picked_up')
 
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
   return (
     <div className="min-h-screen bg-canvas font-body text-ink pb-24">
-      <header className="bg-white px-5 pt-5 pb-3 border-b border-line">
+      <header className="bg-white px-5 pt-5 pb-3 border-b border-line flex items-center justify-between">
         <h1 className="font-heading font-extrabold text-xl">My jobs</h1>
+        <button
+          type="button"
+          aria-label="Sign out"
+          onClick={handleSignOut}
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-surface text-ink-2 shrink-0"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </header>
 
       {/* Availability toggle */}
