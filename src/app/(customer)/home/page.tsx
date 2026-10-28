@@ -9,7 +9,7 @@ export default async function HomePage() {
 
   const [
     { data: { user } },
-    { data: vendors },
+    { data: rawVendors },
     { data: zones },
     { data: areas },
     { data: zoneFares },
@@ -18,7 +18,7 @@ export default async function HomePage() {
     supabase.auth.getUser(),
     supabase
       .from('vendors')
-      .select('*')
+      .select('*, menu_categories(name)')
       .eq('is_verified', true)
       .order('is_open', { ascending: false })
       .order('rating_avg', { ascending: false }),
@@ -28,10 +28,19 @@ export default async function HomePage() {
     supabase.from('fare_levels').select('*').order('sort_order'),
   ])
 
+  // Flatten menu_categories into a string array for each vendor
+  const vendors: (Vendor & { menuCategoryNames: string[] })[] = (rawVendors ?? []).map((v: any) => {
+    const { menu_categories, ...rest } = v
+    return {
+      ...rest,
+      menuCategoryNames: (menu_categories ?? []).map((c: { name: string }) => c.name),
+    }
+  })
+
   return (
     <HomeClient
       userId={user?.id ?? null}
-      vendors={(vendors as Vendor[]) ?? []}
+      vendors={vendors}
       zones={(zones as Zone[]) ?? []}
       areas={(areas as Area[]) ?? []}
       zoneFares={(zoneFares as ZoneFare[]) ?? []}

@@ -23,7 +23,7 @@ const FOOD_CATEGORIES = ['All', 'Rice', 'Swallow', 'Grills', 'Snacks', 'Drinks']
 
 interface Props {
   userId: string | null
-  vendors: Vendor[]
+  vendors: (Vendor & { menuCategoryNames: string[] })[]
   zones: Zone[]
   areas: Area[]
   zoneFares: ZoneFare[]
@@ -72,8 +72,12 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
       if (storeType !== 'all' && v.type !== storeType) return false
       if (search && !v.name.toLowerCase().includes(search.toLowerCase()) &&
           !v.category?.toLowerCase().includes(search.toLowerCase())) return false
-      if (category !== 'All' && storeType === 'restaurant' &&
-          !v.category?.toLowerCase().includes(category.toLowerCase())) return false
+      if (category !== 'All' && storeType === 'restaurant') {
+        const chip = category.toLowerCase()
+        const inVendorCategory = v.category?.toLowerCase().includes(chip) ?? false
+        const inMenuCategories = v.menuCategoryNames.some(n => n.toLowerCase().includes(chip))
+        if (!inVendorCategory && !inMenuCategories) return false
+      }
       return true
     })
   }, [vendors, storeType, category, search])
