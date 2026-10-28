@@ -180,15 +180,6 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
 
   const selectedArea = initialAreas.find(a => a.id === selectedAreaId)
 
-  // Coming-soon areas that still have unset routes among active areas
-  const areasNeedingPrices = initialAreas
-    .filter(a => a.status === 'coming_soon' && a.zone_id)
-    .map(a => {
-      const routeAreas = [...activeAreas, a]
-      const missing = routeAreas.filter(other => !getZoneFare(a, other)?.fare_level_id).length
-      return { area: a, missing }
-    })
-    .filter(x => x.missing > 0)
 
   const checkFromArea = initialAreas.find(a => a.id === checkFrom)
   const checkToArea = initialAreas.find(a => a.id === checkTo)
@@ -212,24 +203,6 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
         </p>
       </div>
 
-      {/* Missing-prices banners */}
-      {areasNeedingPrices.map(({ area, missing }) => (
-        <div key={area.id} className="bg-warn-tint border border-[#F59E0B]/40 rounded-2xl px-4 py-3 flex items-center gap-3">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A4B08" strokeWidth="2" strokeLinecap="round" className="shrink-0">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <p className="flex-1 text-[13px] text-warn">
-            <strong>{areaDisplayName(area)}</strong> needs prices for {missing} route{missing !== 1 ? 's' : ''} before it can go live.
-          </p>
-          <button
-            type="button"
-            onClick={() => setSelectedAreaId(area.id)}
-            className="h-8 px-3 rounded-lg bg-warn text-white text-[12px] font-bold border-0 cursor-pointer shrink-0"
-          >
-            Set prices
-          </button>
-        </div>
-      ))}
 
       {/* Main layout */}
       <div className="flex gap-5 items-start flex-col xl:flex-row">
