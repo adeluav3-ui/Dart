@@ -1,77 +1,88 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import { Phone, Map } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatMoney } from '@/lib/format'
-import { STALE_MS } from '@/lib/geo'
-import type { Order, OrderItem } from '@/types/database'
+import { formatMoney, formatTime } from '@/lib/format'
+import { formatLocationAge, STALE_MS } from '@/lib/geo'
+import { RiderBottomNav } from '@/components/rider/RiderBottomNav'
 
-type JobOrder = Order & {
-  vendors: { name: string; id: string }
-  order_items: { name_snapshot: string; qty: number }[]
+interface JobOrder {
+  id: string
+  code: string
+  status: string
+  area_name: string | null
+  address_zone: string
+  rider_pay: number
+  vendors: { name: string } | null
 }
 
 interface Props {
-  initialJobs: JobOrder[]
   riderId: string
+  firstName: string
+  todayAmount: number
+  todayTrips: number
   initialAvailable: boolean
   locationUpdatedAt: string | null
+  nearestArea: string | null
+  initialJobs: JobOrder[]
 }
 
-const WAIT_MS = 10 * 60 * 1000
 const LOCATION_REFRESH_MS = 2 * 60 * 1000
 
-export function RiderJobsClient({ initialJobs, riderId, initialAvailable, locationUpdatedAt }: Props) {
-  const [jobs, setJobs] = useState<JobOrder[]>(initialJobs)
-  const [pinInputs, setPinInputs] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [now, setNow] = useState(Date.now())
+export function RiderJobsClient({
+  riderId, firstName, todayAmount, todayTrips,
+  initialAvailable, locationUpdatedAt, nearestArea: initialNearestArea,
+  initialJobs,
+}: Props) {
+  const router = useRouter()
+  const supabase = createClient()
 
   const [available, setAvailable] = useState(initialAvailable)
   const [availLoading, setAvailLoading] = useState(false)
-  const [availError, setAvailError] = useState<string | null>(null)
-  const locationUpdatedRef = useRef<string | null>(locationUpdatedAt)
+  const [availError, setAvailError] = useState('')
+  const [locUpdatedAt, setLocUpdatedAt] = useState<string | null>(locationUpdatedAt)
+  const [nearestArea, setNearestArea] = useState<string | null>(initialNearestArea)
+  const [jobs, setJobs] = useState<JobOrder[]>(initialJobs)
+  const [, forceRender] = useState(0)
 
-  const supabase = createClient()
+  const supabaseRef = useRef(supabase)
 
-  const isLocationStale = initialAvailable &&
-    locationUpdatedAt &&
-    (Date.now() - new Date(locationUpdatedAt).getTime()) > STALE_MS
+  const isStale = available && locUpdatedAt &&
+    (Date.now() - new Date(locUpdatedAt).getTime()) > STALE_MS
 
-  // Clock for gate countdown
+  // Clock tick for location age
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
+    const t = setInterval(() => forceRender(n => n + 1), 30_000)
     return () => clearInterval(t)
   }, [])
 
-  // Realtime: new jobs assigned or status changes
+  // Realtime: new job assigned or status changes
   useEffect(() => {
-    const channel = supabase
-      .channel(`rider:${riderId}`)
+    const channel = supabaseRef.current
+      .channel(`rider-jobs:${riderId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `rider_id=eq.${riderId}` },
         payload => {
           if (payload.eventType === 'INSERT') {
             setJobs(prev => [...prev, payload.new as JobOrder])
+            navigator.vibrate?.([200, 100, 200])
           } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as JobOrder
-            if (!['ready', 'picked_up'].includes(updated.status)) {
-              setJobs(prev => prev.filter(j => j.id !== updated.id))
+            const u = payload.new as JobOrder
+            if (!['accepted', 'ready', 'picked_up'].includes(u.status)) {
+              setJobs(prev => prev.filter(j => j.id !== u.id))
             } else {
-              setJobs(prev => prev.map(j => j.id === updated.id ? { ...j, ...updated } : j))
+              setJobs(prev => prev.map(j => j.id === u.id ? { ...j, ...u } : j))
             }
           }
         }
       )
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabaseRef.current.removeChannel(channel) }
   }, [riderId])
 
-  // Background location refresh every 2 min while available and page open
+  // Background location refresh every 2 min while available
   useEffect(() => {
     if (!available) return
     const interval = setInterval(() => {
@@ -86,37 +97,20 @@ export function RiderJobsClient({ initialJobs, riderId, initialAvailable, locati
             accuracy: pos.coords.accuracy,
           }),
         }).then(() => {
-          locationUpdatedRef.current = new Date().toISOString()
+          setLocUpdatedAt(new Date().toISOString())
         }).catch(() => {})
       })
     }, LOCATION_REFRESH_MS)
     return () => clearInterval(interval)
   }, [available])
 
-  async function toggleAvailability() {
-    if (availLoading) return
-    setAvailError(null)
-
-    if (available) {
-      // Turn off — no location needed
-      setAvailLoading(true)
-      const res = await fetch('/api/rider/availability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ available: false }),
-      })
-      setAvailLoading(false)
-      if (res.ok) { setAvailable(false) } else { setAvailError('Could not update') }
-      return
-    }
-
-    // Turn on — request location first
+  async function goAvailable() {
     if (!navigator.geolocation) {
-      setAvailError('Geolocation not supported by this browser')
+      setAvailError('Geolocation is not supported by your browser')
       return
     }
-
     setAvailLoading(true)
+    setAvailError('')
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const res = await fetch('/api/rider/availability', {
@@ -132,7 +126,9 @@ export function RiderJobsClient({ initialJobs, riderId, initialAvailable, locati
         setAvailLoading(false)
         if (res.ok) {
           setAvailable(true)
-          locationUpdatedRef.current = new Date().toISOString()
+          const now = new Date().toISOString()
+          setLocUpdatedAt(now)
+          // Find nearest area client-side (approximate)
         } else {
           const j = await res.json().catch(() => ({}))
           setAvailError(j.error ?? 'Could not update')
@@ -150,346 +146,191 @@ export function RiderJobsClient({ initialJobs, riderId, initialAvailable, locati
     )
   }
 
-  async function api(path: string, body?: object) {
-    setLoading(path)
-    setError(null)
-    const res = await fetch(path, {
+  async function goOffline() {
+    setAvailLoading(true)
+    const res = await fetch('/api/rider/availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
+      body: JSON.stringify({ available: false }),
     })
-    const json = await res.json().catch(() => ({}))
-    setLoading(null)
-    if (!res.ok) setError(json.error ?? 'Failed')
-    return res.ok
+    setAvailLoading(false)
+    if (res.ok) setAvailable(false)
+    else setAvailError('Could not update')
   }
 
-  async function markPickedUp(orderId: string) {
-    await api(`/api/orders/${orderId}/transition`, { toStatus: 'picked_up' })
-  }
-
-  async function confirmDelivery(orderId: string) {
-    const pin = pinInputs[orderId]?.trim()
-    if (!pin || pin.length !== 4) { setError('Enter the 4-digit PIN'); return }
-    await api(`/api/orders/${orderId}/transition`, { toStatus: 'delivered', deliveryPin: pin })
-  }
-
-  async function markArrived(orderId: string) {
-    await api(`/api/orders/${orderId}/gate-arrived`)
-  }
-
-  async function markNoShow(orderId: string) {
-    await api(`/api/orders/${orderId}/gate-no-show`)
-  }
-
-  const pickupJobs = jobs.filter(j => j.status === 'ready')
-  const deliveryJobs = jobs.filter(j => j.status === 'picked_up')
-
-  async function handleSignOut() {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
+  async function refreshLocation() {
+    if (!navigator.geolocation) return
+    setAvailLoading(true)
+    navigator.geolocation.getCurrentPosition(async pos => {
+      await fetch('/api/rider/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          available: true,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+      })
+      setLocUpdatedAt(new Date().toISOString())
+      setAvailLoading(false)
+    }, () => setAvailLoading(false), { timeout: 10_000 })
   }
 
   return (
-    <div className="min-h-screen bg-canvas font-body text-ink pb-24">
-      <header className="bg-white px-5 pt-5 pb-3 border-b border-line flex items-center justify-between">
-        <h1 className="font-heading font-extrabold text-xl">My jobs</h1>
-        <button
-          type="button"
-          aria-label="Sign out"
-          onClick={handleSignOut}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-surface text-ink-2 shrink-0"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-        </button>
+    <div className="min-h-screen bg-canvas font-body text-ink"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}>
+
+      {/* Dark header */}
+      <header
+        className="bg-ink px-5 pb-4 flex items-end justify-between"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
+      >
+        <div>
+          <p className="text-[11px] text-white/50 font-medium tracking-wide uppercase mb-0.5">Dart rider</p>
+          <p className="font-heading font-extrabold text-[22px] text-white leading-tight">Hi, {firstName}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[11px] text-white/50 font-medium tracking-wide uppercase mb-0.5">Today</p>
+          <p className="text-[15px] font-bold text-white">{formatMoney(todayAmount)} · {todayTrips} {todayTrips === 1 ? 'trip' : 'trips'}</p>
+        </div>
       </header>
 
-      {/* Availability toggle */}
-      <div className="mx-4 mt-4 bg-white rounded-2xl p-4 flex flex-col gap-3">
-        {isLocationStale && (
-          <div className="px-3 py-2 rounded-xl bg-warn-tint text-[13px] text-warn font-semibold">
-            Your location hasn&apos;t refreshed in over 30 minutes. Toggle availability to update it.
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[15px] font-bold">
-              {available ? "I'm available" : "I'm not available"}
-            </span>
-            <span className="text-xs text-ink-2">
-              {available ? 'Vendors can see and call you for jobs' : "You won’t receive new job assignments"}
-            </span>
-          </div>
+      <div className="px-4 pt-4 flex flex-col gap-3">
+
+        {/* Availability card */}
+        <div
+          className={`rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors ${available ? 'bg-brand' : 'bg-white'}`}
+        >
+          {/* Toggle */}
           <button
             type="button"
             role="switch"
             aria-checked={available}
             disabled={availLoading}
-            onClick={toggleAvailability}
-            className={`relative w-14 h-7 rounded-full border-0 cursor-pointer transition-colors shrink-0 disabled:opacity-60 ${available ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
+            onClick={available ? goOffline : goAvailable}
+            className={`relative w-16 h-8 rounded-full border-0 cursor-pointer transition-colors shrink-0 disabled:opacity-60 ${available ? 'bg-white/30' : 'bg-[#C3C8CD]'}`}
           >
-            <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${available ? 'left-8' : 'left-1'}`} />
+            <span className={`absolute top-1 w-6 h-6 rounded-full shadow transition-all ${available ? 'bg-white left-9' : 'bg-white left-1'}`} />
           </button>
+
+          {available ? (
+            <>
+              <p className="font-heading font-extrabold text-[26px] text-white leading-tight">I&apos;m available</p>
+              <p className="text-[14px] text-white/80 text-center">Nearby vendors can see you and call you for jobs.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-heading font-extrabold text-[22px] text-ink leading-tight">I&apos;m not available</p>
+              <p className="text-[13px] text-ink-2 text-center">Go available to receive job assignments.</p>
+            </>
+          )}
+          {availLoading && <p className="text-[13px] text-white/70">Updating…</p>}
+          {availError && <p className="text-[13px] text-danger bg-white/90 rounded-xl px-3 py-1.5 text-center">{availError}</p>}
         </div>
-        {availLoading && <p className="text-xs text-ink-2">Updating…</p>}
-        {availError && <p className="text-sm text-danger">{availError}</p>}
-      </div>
 
-      <div className="px-4 py-4 flex flex-col gap-4">
-        {pickupJobs.length === 0 && deliveryJobs.length === 0 && (
-          <p className="text-center text-ink-2 py-10">No active jobs</p>
-        )}
-
-        {pickupJobs.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-[13px] font-bold text-ink-2 uppercase tracking-wide">Pick up</h2>
-            {pickupJobs.map(job => (
-              <JobCard
-                key={job.id}
-                job={job}
-                action="pickup"
-                loading={loading?.includes(job.id) ?? false}
-                onPickup={() => markPickedUp(job.id)}
-              />
-            ))}
-          </section>
-        )}
-
-        {deliveryJobs.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-[13px] font-bold text-ink-2 uppercase tracking-wide">Deliver</h2>
-            {deliveryJobs.map(job => (
-              <div key={job.id} className="flex flex-col gap-2">
-                {job.is_gate_pickup ? (
-                  <GateCard
-                    job={job}
-                    now={now}
-                    waitMs={WAIT_MS}
-                    loading={!!loading?.includes(job.id)}
-                    pinValue={pinInputs[job.id] ?? ''}
-                    onPinChange={val => setPinInputs(p => ({ ...p, [job.id]: val }))}
-                    onArrived={() => markArrived(job.id)}
-                    onNoShow={() => markNoShow(job.id)}
-                    onDeliver={() => confirmDelivery(job.id)}
-                  />
-                ) : (
-                  <JobCard
-                    job={job}
-                    action="deliver"
-                    loading={!!loading?.includes(job.id)}
-                    onDeliver={() => confirmDelivery(job.id)}
-                    pinValue={pinInputs[job.id] ?? ''}
-                    onPinChange={val => setPinInputs(p => ({ ...p, [job.id]: val }))}
-                  />
-                )}
-                {error && !loading && (
-                  <p className="text-sm text-danger px-4">{error}</p>
+        {/* When available: location + warning */}
+        {available && (
+          <>
+            {/* Location card */}
+            <div className="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B7A47" strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                <path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/>
+              </svg>
+              <div className="flex-1 min-w-0">
+                {nearestArea && <p className="text-[14px] font-bold text-ink">Near {nearestArea}</p>}
+                <p className="text-[12px] text-ink-2">
+                  Location updated {locUpdatedAt ? formatLocationAge(locUpdatedAt) : 'never'}
+                  {' · '}keeps updating while Dart is open
+                </p>
+                {isStale && (
+                  <p className="text-[12px] text-danger font-semibold mt-0.5">Location is stale — tap Refresh</p>
                 )}
               </div>
-            ))}
-          </section>
+              <button
+                type="button"
+                onClick={refreshLocation}
+                disabled={availLoading}
+                className="h-8 px-3 rounded-lg border border-line text-[12px] font-bold text-ink bg-white shrink-0 disabled:opacity-50"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {/* Amber tip */}
+            <div className="bg-warn-tint rounded-2xl px-4 py-3.5 flex gap-3 items-start">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A4B08" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-0.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <p className="text-[13px] text-warn leading-relaxed">
+                Vendors will <strong>call you</strong> before giving you a job. Keep your phone on and loud. If Dart stays closed for 30 minutes, you'll go offline automatically.
+              </p>
+            </div>
+          </>
         )}
-      </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 h-[72px] px-3 pb-3.5 pt-2 bg-white border-t border-line grid grid-cols-2">
-        <Link href="/rider/jobs" className="flex flex-col items-center justify-center gap-1 text-xs font-bold text-brand no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          Jobs
-        </Link>
-        <Link href="/rider/earnings" className="flex flex-col items-center justify-center gap-1 text-xs font-medium text-ink-2 no-underline">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>
-          Earnings
-        </Link>
-      </nav>
-    </div>
-  )
-}
+        {/* When not available: how it works */}
+        {!available && (
+          <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
+            <p className="text-[13px] font-bold text-ink-2 uppercase tracking-wide">How Dart jobs work</p>
+            {[
+              { n: '1', text: 'A vendor calls you to offer a job' },
+              { n: '2', text: 'They assign the order to you on their board' },
+              { n: '3', text: 'You pick it up from the vendor and go to the customer' },
+              { n: '4', text: 'Confirm delivery with the customer\'s 4-digit PIN' },
+            ].map(step => (
+              <div key={step.n} className="flex items-center gap-3">
+                <span className="w-7 h-7 rounded-full bg-surface flex items-center justify-center text-[13px] font-bold text-ink-2 shrink-0">{step.n}</span>
+                <span className="text-[14px] text-ink">{step.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
-// ── Standard job card (pickup + non-gate deliver) ──────────────
-function JobCard({
-  job, action, loading, onPickup, onDeliver, pinValue, onPinChange,
-}: {
-  job: JobOrder
-  action: 'pickup' | 'deliver'
-  loading: boolean
-  onPickup?: () => void
-  onDeliver?: () => void
-  pinValue?: string
-  onPinChange?: (val: string) => void
-}) {
-  return (
-    <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
-      <div className="flex justify-between items-center">
-        <span className="text-base font-bold">{job.code}</span>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-          action === 'pickup' ? 'bg-brand-tint text-brand-ink' : 'bg-warn-tint text-warn'
-        }`}>
-          {action === 'pickup' ? 'Pick up' : 'Deliver'}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-0.5 p-3 rounded-xl bg-canvas">
-        <span className="text-xs font-semibold text-ink-2">Vendor</span>
-        <span className="text-[15px] font-bold">{job.vendors?.name}</span>
-        <a href="tel:" className="flex items-center gap-1.5 text-sm text-brand font-semibold mt-1">
-          <Phone size={14} /> Call vendor
-        </a>
-      </div>
-
-      <div className="flex flex-col gap-0.5 p-3 rounded-xl bg-canvas">
-        <span className="text-xs font-semibold text-ink-2">Deliver to</span>
-        <span className="text-[15px] font-bold">{job.area_name ?? job.address_zone}</span>
-        {job.address_landmark && <span className="text-sm text-ink-2">{job.address_landmark}</span>}
-        {job.address_details && <span className="text-sm text-ink-2">{job.address_details}</span>}
-        <div className="flex items-center gap-3 mt-1">
-          <a href={`tel:${job.address_phone}`} className="flex items-center gap-1.5 text-sm text-brand font-semibold">
-            <Phone size={14} /> Call customer
-          </a>
-          {(job.area_name ?? job.address_zone) && (
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent((job.area_name ?? job.address_zone) + ', Sagamu, Ogun State')}`}
-              target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-brand font-semibold"
-            >
-              <Map size={14} /> Open in Maps
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        {job.order_items.map((oi, i) => (
-          <span key={i} className="text-sm">{oi.qty}× {oi.name_snapshot}</span>
-        ))}
-        <span className="text-[15px] font-bold mt-1">{formatMoney(job.total)}</span>
-      </div>
-
-      {action === 'pickup' && (
-        <button type="button" disabled={loading} onClick={onPickup}
-          className="h-btn rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-50">
-          {loading ? 'Confirming…' : 'Picked up from vendor'}
-        </button>
-      )}
-
-      {action === 'deliver' && (
+        {/* Current job(s) */}
         <div className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-            Customer PIN (4 digits)
-            <input
-              type="text" inputMode="numeric" maxLength={4}
-              value={pinValue} onChange={e => onPinChange?.(e.target.value.replace(/\D/g, ''))}
-              placeholder="0000"
-              className="h-btn-sm px-3 rounded-xl border border-line font-body text-xl tracking-[0.5em] text-center"
-            />
-          </label>
-          <button type="button" disabled={loading || !pinValue || pinValue.length < 4} onClick={onDeliver}
-            className="h-btn rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-50">
-            {loading ? 'Verifying…' : 'Confirm delivery'}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Gate pickup card ───────────────────────────────────────────
-function GateCard({
-  job, now, waitMs, loading, pinValue, onPinChange, onArrived, onNoShow, onDeliver,
-}: {
-  job: JobOrder
-  now: number
-  waitMs: number
-  loading: boolean
-  pinValue: string
-  onPinChange: (val: string) => void
-  onArrived: () => void
-  onNoShow: () => void
-  onDeliver: () => void
-}) {
-  const arrivedAt = job.gate_arrived_at ? new Date(job.gate_arrived_at).getTime() : null
-  const elapsed = arrivedAt ? now - arrivedAt : 0
-  const canNoShow = !!arrivedAt && elapsed >= waitMs
-  const secsLeft = arrivedAt ? Math.max(0, Math.ceil((waitMs - elapsed) / 1000)) : 0
-  const minsLeft = Math.floor(secsLeft / 60)
-  const secsDisplay = String(secsLeft % 60).padStart(2, '0')
-
-  return (
-    <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
-      <div className="flex justify-between items-center">
-        <span className="text-base font-bold">{job.code}</span>
-        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-warn-tint text-warn">Gate pickup</span>
-      </div>
-
-      <div className="flex flex-col gap-0.5 p-3 rounded-xl bg-canvas">
-        <span className="text-xs font-semibold text-ink-2">Vendor</span>
-        <span className="text-[15px] font-bold">{job.vendors?.name}</span>
-        <a href="tel:" className="flex items-center gap-1.5 text-sm text-brand font-semibold mt-1">
-          <Phone size={14} /> Call vendor
-        </a>
-      </div>
-
-      <div className="flex flex-col gap-0.5 p-3 rounded-xl bg-canvas">
-        <span className="text-xs font-semibold text-ink-2">Deliver to gate</span>
-        <span className="text-[15px] font-bold">{job.area_name ?? job.address_zone}</span>
-        {job.address_landmark && <span className="text-sm text-ink-2">{job.address_landmark}</span>}
-      </div>
-
-      {!arrivedAt && !job.gate_no_show && (
-        <button type="button" disabled={loading} onClick={onArrived}
-          className="h-btn rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-50">
-          {loading ? 'Recording…' : "I've arrived at the gate"}
-        </button>
-      )}
-
-      {arrivedAt && !job.gate_no_show && (
-        <>
-          <div className="px-3 py-2.5 rounded-xl bg-brand-tint text-[13px] text-brand-ink flex items-center justify-between">
-            <span>Waiting for customer</span>
-            {!canNoShow && (
-              <span className="font-bold tabular-nums">{minsLeft}:{secsDisplay}</span>
-            )}
-          </div>
-
-          <a href={`tel:${job.address_phone}`}
-            className="h-11 rounded-xl bg-surface flex items-center justify-center gap-2 text-[14px] font-bold text-brand">
-            <Phone size={16} />
-            Call customer — {job.address_phone}
-          </a>
-
-          <div className="flex flex-col gap-2">
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-              Customer PIN (4 digits)
-              <input
-                type="text" inputMode="numeric" maxLength={4}
-                value={pinValue} onChange={e => onPinChange(e.target.value.replace(/\D/g, ''))}
-                placeholder="0000"
-                className="h-btn-sm px-3 rounded-xl border border-line font-body text-xl tracking-[0.5em] text-center"
-              />
-            </label>
-            <button type="button" disabled={loading || pinValue.length < 4} onClick={onDeliver}
-              className="h-btn rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-50">
-              {loading ? 'Verifying…' : 'Confirm delivery'}
-            </button>
-          </div>
-
-          {canNoShow && (
-            <button type="button" disabled={loading} onClick={onNoShow}
-              className="h-11 rounded-xl border-2 border-danger text-danger font-bold text-[14px] disabled:opacity-50">
-              {loading ? 'Recording…' : 'Customer did not show'}
-            </button>
+          <p className="text-[13px] font-bold text-ink-2 uppercase tracking-wide px-1">Current job</p>
+          {jobs.length === 0 ? (
+            <div className="bg-white rounded-2xl border-2 border-dashed border-line p-6 flex flex-col items-center gap-1 text-center">
+              <p className="text-[15px] font-bold text-ink">No job right now</p>
+              <p className="text-[13px] text-ink-2">When a vendor assigns you, it shows up here.</p>
+            </div>
+          ) : (
+            jobs.map(job => (
+              <button
+                key={job.id}
+                type="button"
+                onClick={() => router.push(`/rider/job/${job.id}`)}
+                className="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3 text-left w-full"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <span className="text-[15px] font-bold text-ink">{job.code}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      job.status === 'ready' ? 'bg-brand-tint text-brand-ink'
+                      : job.status === 'picked_up' ? 'bg-warn-tint text-warn'
+                      : 'bg-surface text-ink-2'
+                    }`}>
+                      {job.status === 'accepted' ? 'Preparing' : job.status === 'ready' ? 'Ready' : 'On the way'}
+                    </span>
+                  </div>
+                  <p className="text-[13px] text-ink-2">
+                    {job.vendors?.name} → {job.area_name ?? job.address_zone}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-0.5 shrink-0">
+                  <span className="text-[15px] font-bold text-brand">{formatMoney(job.rider_pay)}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6168" strokeWidth="2" strokeLinecap="round">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </div>
+              </button>
+            ))
           )}
-        </>
-      )}
-
-      {job.gate_no_show && (
-        <div className="px-3 py-2.5 rounded-xl bg-warn-tint text-[13px] text-warn text-center font-semibold">
-          No-show recorded — admin will decide on refund
         </div>
-      )}
+      </div>
+
+      <RiderBottomNav />
     </div>
   )
 }

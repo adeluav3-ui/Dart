@@ -182,6 +182,10 @@ export interface Rider {
   location_accuracy: number | null
   location_updated_at: string | null
   notes: string | null
+  bike_plate: string | null
+  payout_bank: string | null
+  payout_account_name: string | null
+  payout_account_no: string | null
   created_at: string
 }
 
