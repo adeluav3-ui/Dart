@@ -35,14 +35,12 @@ export async function POST(req: NextRequest) {
   // Append 'vendor' to roles; trigger keeps role column in sync
   const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
   const existing: string[] = target?.roles ?? ['customer']
-  if (!existing.includes('vendor')) {
-    const newRoles = [...existing, 'vendor']
-    const { error: roleErr } = await admin
-      .from('profiles')
-      .update({ roles: newRoles, role: 'vendor' })
-      .eq('id', userId)
-    if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 })
-  }
+  const newRoles = [...new Set([...existing, 'vendor'])]
+  const { error: roleErr } = await admin
+    .from('profiles')
+    .update({ roles: newRoles, role: 'vendor' })
+    .eq('id', userId)
+  if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }

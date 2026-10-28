@@ -16,15 +16,13 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
   const existing: string[] = target?.roles ?? ['customer']
-  if (!existing.includes('rider')) {
-    const newRoles = [...existing, 'rider']
-    const newRole = existing.includes('admin') ? 'admin' : existing.includes('vendor') ? 'vendor' : 'rider'
-    const { error } = await admin
-      .from('profiles')
-      .update({ roles: newRoles, role: newRole })
-      .eq('id', userId)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  const newRoles = [...new Set([...existing, 'rider'])]
+  const newRole = newRoles.includes('admin') ? 'admin' : newRoles.includes('vendor') ? 'vendor' : 'rider'
+  const { error } = await admin
+    .from('profiles')
+    .update({ roles: newRoles, role: newRole })
+    .eq('id', userId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }
