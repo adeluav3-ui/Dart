@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock, Info } from 'lucide-react'
+import { ArrowLeft, Lock, Info, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartSubtotal } from '@/store/cart'
@@ -35,6 +35,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -110,9 +111,40 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
       <div className="px-4 flex flex-col gap-3">
         {/* Order summary */}
         <section className="bg-white rounded-2xl p-4">
-          <div className="flex justify-between items-baseline">
+          <div className="flex justify-between items-center">
             <h2 className="text-[15px] font-bold">{cart.vendorName}</h2>
-            <Link href={`/vendor/${cart.vendorSlug}`} className="text-[13px] font-semibold text-brand no-underline">Add items</Link>
+            <div className="flex items-center gap-3">
+              {confirmClear ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClear(false)}
+                    className="text-[13px] text-ink-2 bg-transparent border-0 cursor-pointer p-0"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { clearCart(); router.push('/') }}
+                    className="text-[13px] font-semibold text-danger bg-transparent border-0 cursor-pointer p-0"
+                  >
+                    Clear cart
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href={`/vendor/${cart.vendorSlug}`} className="text-[13px] font-semibold text-brand no-underline">Add items</Link>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClear(true)}
+                    aria-label="Clear cart"
+                    className="w-8 h-8 flex items-center justify-center text-ink-2 bg-transparent border-0 cursor-pointer rounded-lg hover:bg-surface -mr-1"
+                  >
+                    <Trash2 size={16} strokeWidth={2} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex flex-col gap-3 mt-3">
             {cart.items.map((ci, i) => (
