@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   // Append 'vendor' to roles; trigger keeps role column in sync
   const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
   const existing: string[] = target?.roles ?? ['customer']
-  const newRoles = [...new Set([...existing, 'vendor'])]
+  const newRoles = Array.from(new Set([...existing, 'vendor']))
   const { error: roleErr } = await admin
     .from('profiles')
     .update({ roles: newRoles, role: 'vendor' })

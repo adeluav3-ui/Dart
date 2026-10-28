@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
   const existing: string[] = target?.roles ?? ['customer']
-  const newRoles = [...new Set([...existing, 'rider'])]
+  const newRoles = Array.from(new Set([...existing, 'rider']))
   const newRole = newRoles.includes('admin') ? 'admin' : newRoles.includes('vendor') ? 'vendor' : 'rider'
   const { error } = await admin
     .from('profiles')
