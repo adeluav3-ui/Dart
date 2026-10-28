@@ -59,7 +59,8 @@ export function RiderJobsClient({
 
   // Realtime: new job assigned or status changes
   useEffect(() => {
-    const channel = supabaseRef.current
+    const client = supabaseRef.current
+    const channel = client
       .channel(`rider-jobs:${riderId}`)
       .on(
         'postgres_changes',
@@ -79,7 +80,7 @@ export function RiderJobsClient({
         }
       )
       .subscribe()
-    return () => { supabaseRef.current.removeChannel(channel) }
+    return () => { client.removeChannel(channel) }
   }, [riderId])
 
   // Background location refresh every 2 min while available
@@ -263,7 +264,7 @@ export function RiderJobsClient({
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               <p className="text-[13px] text-warn leading-relaxed">
-                Vendors will <strong>call you</strong> before giving you a job. Keep your phone on and loud. If Dart stays closed for 30 minutes, you'll go offline automatically.
+                Vendors will <strong>call you</strong> before giving you a job. Keep your phone on and loud. If Dart stays closed for 30 minutes, you&apos;ll go offline automatically.
               </p>
             </div>
           </>

@@ -113,6 +113,7 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor.id])
 
   // Audio alarm for new orders

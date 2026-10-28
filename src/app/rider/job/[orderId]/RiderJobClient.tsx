@@ -141,7 +141,7 @@ export function RiderJobClient({
   order: initialOrder, vendorName, vendorAreaName, vendorDistance, customerName, orderItems,
 }: Props) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabaseRef = useRef(createClient())
 
   const [order, setOrder] = useState(initialOrder)
   const [now, setNow] = useState(Date.now())
@@ -160,7 +160,8 @@ export function RiderJobClient({
 
   // Realtime order updates
   useEffect(() => {
-    const channel = supabase
+    const client = supabaseRef.current
+    const channel = client
       .channel(`job:${order.id}`)
       .on(
         'postgres_changes',
@@ -168,7 +169,7 @@ export function RiderJobClient({
         payload => { setOrder(prev => ({ ...prev, ...payload.new })) }
       )
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { client.removeChannel(channel) }
   }, [order.id])
 
   async function post(path: string, body?: object) {
