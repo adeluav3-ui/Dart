@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { AccountClient } from './AccountClient'
 import Link from 'next/link'
+import { version } from '../../../../package.json'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,8 @@ export default async function AccountPage() {
       profile={profile}
       email={user.email ?? null}
       applications={applications ?? []}
+      userId={user.id}
+      version={version}
     />
   )
 }

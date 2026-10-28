@@ -20,6 +20,7 @@ export interface Profile {
   role: UserRole
   roles: string[]
   last_dashboard: string | null
+  marketing_emails: boolean
   created_at: string
 }
 
@@ -209,7 +210,28 @@ export interface Address {
   landmark: string
   details: string | null
   phone: string | null
+  is_default: boolean
   created_at: string
+}
+
+export interface AppSetting {
+  key: string
+  value: string
+  updated_at: string
+}
+
+export type SupportTicketStatus = 'open' | 'resolved' | 'closed'
+
+export interface SupportTicket {
+  id: string
+  user_id: string | null
+  order_id: string | null
+  subject: string
+  body: string
+  status: SupportTicketStatus
+  admin_note: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Order {

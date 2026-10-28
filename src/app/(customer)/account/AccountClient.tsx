@@ -3,13 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { X, ChevronRight, MapPin, Mail, HelpCircle, Store, Bike, FileText } from 'lucide-react'
+import { X, ChevronRight, MapPin, Bell, HelpCircle, Store, Bike, FileText, Lock, CreditCard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import { normalizePhone, validatePhone } from '@/lib/phone'
 import type { Profile, Application } from '@/types/database'
-
-const APP_VERSION = '1.0.0'
 
 function initials(name: string | null): string {
   if (!name) return '?'
@@ -22,10 +19,15 @@ interface Props {
   profile: Profile | null
   email: string | null
   applications: Application[]
+  userId: string
+  version: string
 }
 
-export function AccountClient({ profile, email, applications }: Props) {
-  const [sheet, setSheet] = useState<'edit' | 'help' | null>(null)
+type Sheet = null | 'signout' | 'deleteaccount'
+
+export function AccountClient({ profile, email, applications, userId, version }: Props) {
+  const [sheet, setSheet] = useState<Sheet>(null)
+  const [deletingAccount, setDeletingAccount] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -36,10 +38,25 @@ export function AccountClient({ profile, email, applications }: Props) {
   const vendorApp = applications.find(a => a.kind === 'vendor')
   const riderApp = applications.find(a => a.kind === 'rider')
 
+  async function switchDashboard(destination: '/vendor' | '/rider') {
+    await supabase.from('profiles').update({ last_dashboard: destination }).eq('id', userId)
+    window.location.href = destination
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
+    window.location.href = '/'
+  }
+
+  async function deleteAccount() {
+    setDeletingAccount(true)
+    await supabase.from('support_tickets').insert({
+      user_id: userId,
+      subject: 'Account deletion request',
+      body: 'User requested account deletion via the app.',
+    })
+    await supabase.auth.signOut()
+    window.location.href = '/'
   }
 
   return (
@@ -65,7 +82,7 @@ export function AccountClient({ profile, email, applications }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => setSheet('edit')}
+            onClick={() => router.push('/account/profile')}
             className="h-8 px-3 rounded-lg bg-surface text-[13px] font-semibold text-ink shrink-0"
           >
             Edit
@@ -80,7 +97,7 @@ export function AccountClient({ profile, email, applications }: Props) {
                 icon={<Store size={18} />}
                 title="Vendor dashboard"
                 subtitle="Manage your menu and orders"
-                href="/vendor"
+                onPress={() => switchDashboard('/vendor')}
               />
             )}
             {isRider && (
@@ -88,87 +105,124 @@ export function AccountClient({ profile, email, applications }: Props) {
                 icon={<Bike size={18} />}
                 title="Rider dashboard"
                 subtitle="View your current job"
-                href="/rider"
+                onPress={() => switchDashboard('/rider')}
               />
             )}
           </div>
         )}
 
-        {/* Addresses + Email */}
+        {/* Addresses + Notifications */}
         <div className="bg-white rounded-2xl overflow-hidden">
           <SectionRow
             icon={<MapPin size={18} />}
             title="Saved addresses"
-            subtitle="Home · add your addresses"
+            subtitle="Add and manage delivery addresses"
             href="/account/addresses"
           />
           <SectionRow
-            icon={<Mail size={18} />}
+            icon={<Bell size={18} />}
             title="Email updates"
-            subtitle={email ? `Order updates go to ${email}` : 'Set your email'}
-            href="/account/email-updates"
+            subtitle="Order updates and promotions"
+            href="/account/notifications"
           />
         </div>
 
+        {/* Help */}
         <div className="bg-white rounded-2xl overflow-hidden">
           <SectionRow
             icon={<HelpCircle size={18} />}
             title="Help and support"
             subtitle="Call us or report a problem with an order"
-            onPress={() => setSheet('help')}
+            href="/account/help"
           />
         </div>
 
         {/* Apply / application status */}
+        {(!isVendor || !isRider) && (
+          <div className="bg-white rounded-2xl overflow-hidden">
+            {!isVendor && (
+              <ApplicationRow
+                icon={<Store size={18} />}
+                title="Sell on Dart"
+                subtitle="List your kitchen, shop or pharmacy"
+                kind="vendor"
+                app={vendorApp ?? null}
+              />
+            )}
+            {!isRider && (
+              <ApplicationRow
+                icon={<Bike size={18} />}
+                title="Ride with Dart"
+                subtitle="Earn delivering in Sagamu"
+                kind="rider"
+                app={riderApp ?? null}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Legal */}
         <div className="bg-white rounded-2xl overflow-hidden">
-          {!isVendor && (
-            <ApplicationRow
-              icon={<Store size={18} />}
-              title="Sell on Dart"
-              subtitle="List your kitchen, shop or pharmacy"
-              kind="vendor"
-              app={vendorApp ?? null}
-            />
-          )}
-          {!isRider && (
-            <ApplicationRow
-              icon={<Bike size={18} />}
-              title="Ride with Dart"
-              subtitle="Earn delivering in Sagamu"
-              kind="rider"
-              app={riderApp ?? null}
-            />
-          )}
           <SectionRow
             icon={<FileText size={18} />}
-            title="Terms and privacy"
-            subtitle="Refund policy, terms of use"
+            title="Terms of use"
             href="/terms"
+          />
+          <SectionRow
+            icon={<Lock size={18} />}
+            title="Privacy policy"
+            href="/privacy"
+          />
+          <SectionRow
+            icon={<CreditCard size={18} />}
+            title="Refund policy"
+            href="/refunds"
           />
         </div>
 
         {/* Sign out */}
         <button
           type="button"
-          onClick={signOut}
+          onClick={() => setSheet('signout')}
           className="bg-white rounded-2xl h-[52px] w-full font-bold text-[15px] text-danger"
         >
           Sign out
         </button>
 
-        <p className="text-center text-[12px] text-ink-2 pb-2">Version {APP_VERSION}</p>
+        {/* Delete account */}
+        <button
+          type="button"
+          onClick={() => setSheet('deleteaccount')}
+          className="h-10 w-full text-[13px] font-semibold text-ink-2"
+        >
+          Delete account
+        </button>
+
+        <p className="text-center text-[12px] text-ink-2 pb-2">Version {version}</p>
       </div>
 
-      {/* Sheets */}
-      {sheet === 'edit' && (
-        <EditProfileSheet
-          profile={profile}
-          onClose={() => setSheet(null)}
-          onSaved={() => { setSheet(null); router.refresh() }}
-        />
+      {/* Sign out confirm */}
+      {sheet === 'signout' && (
+        <SheetWrapper title="Sign out?" onClose={() => setSheet(null)}>
+          <p className="text-[14px] text-ink-2 leading-relaxed">
+            You&apos;ll need to sign back in to see your orders and account.
+          </p>
+          <Button variant="danger" onClick={signOut} fullWidth size="lg">Sign out</Button>
+          <Button variant="ghost" onClick={() => setSheet(null)} fullWidth size="lg">Cancel</Button>
+        </SheetWrapper>
       )}
-      {sheet === 'help' && (
-        <HelpSheet onClose={() => setSheet(null)} />
+
+      {/* Delete account confirm */}
+      {sheet === 'deleteaccount' && (
+        <SheetWrapper title="Delete account" onClose={() => setSheet(null)}>
+          <p className="text-[14px] text-ink-2 leading-relaxed">
+            We&apos;ll process your request within 48 hours. Your orders, addresses and data will be removed.
+          </p>
+          <Button variant="danger" onClick={deleteAccount} loading={deletingAccount} fullWidth size="lg">
+            Delete my account
+          </Button>
+          <Button variant="ghost" onClick={() => setSheet(null)} fullWidth size="lg">Cancel</Button>
+        </SheetWrapper>
       )}
     </div>
   )
@@ -296,104 +350,5 @@ function SheetWrapper({ title, onClose, children }: { title: string; onClose: ()
         </div>
       </div>
     </>
-  )
-}
-
-function EditProfileSheet({ profile, onClose, onSaved }: { profile: Profile | null; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState(profile?.full_name ?? '')
-  const [rawPhone, setRawPhone] = useState(() => {
-    const p = profile?.phone ?? ''
-    // Strip +234 prefix for display in the input
-    return p.startsWith('+234') ? p.slice(4) : p.startsWith('0') ? p.slice(1) : p
-  })
-  const [saving, setSaving] = useState(false)
-  const [nameError, setNameError] = useState('')
-  const [phoneError, setPhoneError] = useState('')
-  const supabase = createClient()
-
-  async function save() {
-    if (!profile) return
-    setNameError('')
-    setPhoneError('')
-
-    const nameTrimmed = name.trim()
-    if (!nameTrimmed) { setNameError('Enter your full name'); return }
-    if (nameTrimmed.split(/\s+/).length < 2) { setNameError('Enter both first and last name'); return }
-
-    const fullRaw = '0' + rawPhone.replace(/\D/g, '')
-    if (!validatePhone(fullRaw)) { setPhoneError('Enter a valid Nigerian mobile number'); return }
-    const normalised = normalizePhone(fullRaw)!
-
-    setSaving(true)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: nameTrimmed, phone: normalised })
-      .eq('id', profile.id)
-    setSaving(false)
-    if (error) { setPhoneError(error.message); return }
-    onSaved()
-  }
-
-  return (
-    <SheetWrapper title="Edit profile" onClose={onClose}>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-semibold text-ink-2">Full name</label>
-        <input type="text" value={name} onChange={e => { setName(e.target.value); setNameError('') }}
-          placeholder="First and last name"
-          className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
-        {nameError && <p className="text-[12px] text-danger">{nameError}</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-semibold text-ink-2">Phone number</label>
-        <div className="flex h-11 rounded-xl border border-line bg-white overflow-hidden">
-          <div className="flex items-center px-3 border-r border-line bg-surface shrink-0">
-            <span className="text-[13px] font-semibold text-ink-2">NG +234</span>
-          </div>
-          <input
-            type="tel"
-            inputMode="tel"
-            value={rawPhone}
-            onChange={e => { setRawPhone(e.target.value); setPhoneError('') }}
-            placeholder="8012345678"
-            className="flex-1 px-3 font-body text-[14px] text-ink bg-transparent focus:outline-none"
-          />
-        </div>
-        {phoneError && <p className="text-[12px] text-danger">{phoneError}</p>}
-      </div>
-      <Button onClick={save} loading={saving} fullWidth size="lg">Save changes</Button>
-    </SheetWrapper>
-  )
-}
-
-function HelpSheet({ onClose }: { onClose: () => void }) {
-  return (
-    <SheetWrapper title="Help and support" onClose={onClose}>
-      <div className="flex flex-col gap-4">
-        <div className="bg-brand-tint rounded-2xl p-4 flex flex-col gap-2">
-          <p className="text-[13px] font-semibold text-brand-ink">Call us</p>
-          <a
-            href="tel:+2348000000000"
-            className="h-11 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center no-underline"
-          >
-            +234 800 000 0000
-          </a>
-          <p className="text-[12px] text-brand-ink/70 text-center">Mon – Sat · 8 am – 9 pm</p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-semibold text-ink-2">Common questions</p>
-          {[
-            'Where is my order?',
-            'I want a refund',
-            'An item was missing',
-            'Wrong order delivered',
-          ].map(q => (
-            <div key={q} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between">
-              <span className="text-[14px] text-ink">{q}</span>
-              <ChevronRight size={16} className="text-ink-2" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </SheetWrapper>
   )
 }
