@@ -7,6 +7,11 @@ const withPWA = require('next-pwa')({
 })
 
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/terms': ['./content/**/*'],
+    '/privacy': ['./content/**/*'],
+    '/refunds': ['./content/**/*'],
+  },
   images: {
     remotePatterns: [
       {
