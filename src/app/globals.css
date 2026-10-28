@@ -6,7 +6,7 @@
 
 @layer base {
   body {
-    @apply font-body text-ink bg-white;
+    @apply font-body text-ink bg-canvas;
     -webkit-font-smoothing: antialiased;
   }
 

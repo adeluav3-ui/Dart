@@ -78,7 +78,6 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const isLive = item?.status === 'live'
   const priceKobo = Math.round(parseFloat(priceStr || '0') * 100)
   const valid = name.trim().length > 0
 
@@ -149,31 +148,28 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
 
     try {
       if (item) {
-        // Edit existing item
+        // Edit existing item — all changes go live immediately
         let uploadedUrl: string | null = null
         if (photoBlob) {
           uploadedUrl = await uploadPhoto(item.id)
           if (!uploadedUrl) { setSaving(false); return }
         }
-
-        if (isLive) {
-          // For live items: changes to price/photo go to pending fields
-          const updates: Record<string, unknown> = { name: name.trim(), description: description.trim() || null, category_id: categoryId || null, pack_size: packSize.trim() || null }
-          if (priceKobo > 0 && priceKobo !== item.base_price) updates.pending_price = priceKobo
-          if (uploadedUrl) updates.pending_photo_url = uploadedUrl
-          await supabase.from('menu_items').update(updates).eq('id', item.id)
-        } else {
-          const updates: Record<string, unknown> = { name: name.trim(), description: description.trim() || null, category_id: categoryId || null, pack_size: packSize.trim() || null }
-          if (priceKobo > 0) updates.base_price = priceKobo
-          if (uploadedUrl) updates.photo_url = uploadedUrl
-          await supabase.from('menu_items').update(updates).eq('id', item.id)
+        const updates: Record<string, unknown> = {
+          name: name.trim(),
+          description: description.trim() || null,
+          category_id: categoryId || null,
+          pack_size: packSize.trim() || null,
+          status: 'live',
         }
+        if (priceKobo > 0) updates.base_price = priceKobo
+        if (uploadedUrl) updates.photo_url = uploadedUrl
+        await supabase.from('menu_items').update(updates).eq('id', item.id)
 
         if (isRestaurant(vendor.type)) {
           await saveOptionGroups(item.id)
         }
       } else {
-        // Create new item
+        // Create new item — go live immediately
         const { data: newItem, error: insertErr } = await supabase
           .from('menu_items')
           .insert({
@@ -185,7 +181,7 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
             pack_size: packSize.trim() || null,
             sort_order: 0,
             is_available: true,
-            status: 'draft',
+            status: 'live',
           })
           .select()
           .single()
@@ -210,14 +206,6 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
     } finally {
       setSaving(false)
     }
-  }
-
-  async function submitForReview() {
-    if (!item) return
-    setSaving(true)
-    await fetch(`/api/vendor/items/${item.id}/submit`, { method: 'POST' })
-    setSaving(false)
-    router.push('/vendor/menu')
   }
 
   function addOptionGroup() {
@@ -272,14 +260,6 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
           {item ? 'Edit item' : 'New item'}
         </h1>
       </header>
-
-      {isLive && (
-        <div className="mx-4 mt-3 px-4 py-3 bg-brand-tint rounded-2xl">
-          <p className="text-sm text-brand-ink font-medium">
-            This item is live. Price and photo changes will be reviewed before going live. Other edits apply immediately.
-          </p>
-        </div>
-      )}
 
       <div className="px-4 py-4 flex flex-col gap-5 pb-28">
         {/* Photo */}
@@ -404,9 +384,7 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
 
         {/* Price */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-bold">
-            Price (₦){isLive && ' — changes go to review'}
-          </label>
+          <label className="text-sm font-bold">Price (₦)</label>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-ink-2">₦</span>
             <input
@@ -544,20 +522,8 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
           {saving ? 'Saving…' : item ? 'Save changes' : 'Create item'}
         </button>
 
-        {/* Submit for review (only if draft/rejected) */}
-        {item && (item.status === 'draft' || item.status === 'rejected') && item.base_price > 0 && item.photo_url && (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={submitForReview}
-            className="w-full h-btn rounded-2xl bg-white border border-brand text-brand font-body text-base font-bold disabled:opacity-50"
-          >
-            Submit for review
-          </button>
-        )}
-
-        {/* Delete (only existing items not live) */}
-        {item && item.status !== 'live' && (
+        {/* Delete */}
+        {item && (
           <button
             type="button"
             disabled={saving}

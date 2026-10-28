@@ -289,11 +289,6 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${STATUS_COLOR[item.status]}`}>
                   {STATUS_LABEL[item.status]}
                 </span>
-                {item.pending_price != null && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700">
-                    Price change pending
-                  </span>
-                )}
               </div>
               <span className={`text-[14px] font-semibold ${item.base_price > 0 ? 'text-brand' : 'text-ink-2'}`}>
                 {item.base_price > 0 ? formatMoney(item.base_price) : 'No price set'}
