@@ -17,9 +17,11 @@ export async function POST(req: NextRequest) {
   const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
   const existing: string[] = target?.roles ?? ['customer']
   const stripped = existing.filter(r => r !== 'vendor' && r !== 'rider')
+  const newRoles = stripped.length ? stripped : ['customer']
+  const newRole = newRoles.includes('admin') ? 'admin' : 'customer'
   const { error } = await admin
     .from('profiles')
-    .update({ roles: stripped.length ? stripped : ['customer'] })
+    .update({ roles: newRoles, role: newRole })
     .eq('id', userId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

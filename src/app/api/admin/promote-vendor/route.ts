@@ -36,9 +36,10 @@ export async function POST(req: NextRequest) {
   const { data: target } = await admin.from('profiles').select('roles').eq('id', userId).single()
   const existing: string[] = target?.roles ?? ['customer']
   if (!existing.includes('vendor')) {
+    const newRoles = [...existing, 'vendor']
     const { error: roleErr } = await admin
       .from('profiles')
-      .update({ roles: [...existing, 'vendor'] })
+      .update({ roles: newRoles, role: 'vendor' })
       .eq('id', userId)
     if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 })
   }
