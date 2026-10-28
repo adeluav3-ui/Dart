@@ -14,9 +14,9 @@ export default async function AdminUsersPage() {
     { data: { users: authUsers } },
     { data: zonesData },
   ] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, phone, role, roles, created_at').order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, full_name, phone, role, roles, created_at').order('created_at', { ascending: false }),
     admin.auth.admin.listUsers({ perPage: 1000 }),
-    supabase.from('zones').select('id, name').eq('is_active', true).order('name'),
+    admin.from('zones').select('id, name').eq('is_active', true).order('name'),
   ])
 
   const profileMap = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
