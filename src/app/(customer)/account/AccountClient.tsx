@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { X, ChevronRight, MapPin, Bell, HelpCircle, Store, Bike, FileText, Lock, CreditCard } from 'lucide-react'
+import { X, ChevronRight, MapPin, Bell, HelpCircle, Store, Bike, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import type { Profile, Application } from '@/types/database'
@@ -23,7 +23,7 @@ interface Props {
   version: string
 }
 
-type Sheet = null | 'signout' | 'deleteaccount'
+type Sheet = null | 'signout' | 'deleteaccount' | 'legal'
 
 export function AccountClient({ profile, email, applications, userId, version }: Props) {
   const [sheet, setSheet] = useState<Sheet>(null)
@@ -165,18 +165,9 @@ export function AccountClient({ profile, email, applications, userId, version }:
         <div className="bg-white rounded-2xl overflow-hidden">
           <SectionRow
             icon={<FileText size={18} />}
-            title="Terms of use"
-            href="/terms"
-          />
-          <SectionRow
-            icon={<Lock size={18} />}
-            title="Privacy policy"
-            href="/privacy"
-          />
-          <SectionRow
-            icon={<CreditCard size={18} />}
-            title="Refund policy"
-            href="/refunds"
+            title="Terms and privacy"
+            subtitle="Terms of use, privacy policy, refund policy"
+            onPress={() => setSheet('legal')}
           />
         </div>
 
@@ -200,6 +191,27 @@ export function AccountClient({ profile, email, applications, userId, version }:
 
         <p className="text-center text-[12px] text-ink-2 pb-2">Version {version}</p>
       </div>
+
+      {/* Legal links sheet */}
+      {sheet === 'legal' && (
+        <SheetWrapper title="Terms and privacy" onClose={() => setSheet(null)}>
+          <Link href="/terms" onClick={() => setSheet(null)}
+            className="flex items-center justify-between py-3 border-b border-line no-underline">
+            <span className="text-[15px] font-semibold text-ink">Terms of use</span>
+            <ChevronRight size={16} className="text-ink-2" />
+          </Link>
+          <Link href="/privacy" onClick={() => setSheet(null)}
+            className="flex items-center justify-between py-3 border-b border-line no-underline">
+            <span className="text-[15px] font-semibold text-ink">Privacy policy</span>
+            <ChevronRight size={16} className="text-ink-2" />
+          </Link>
+          <Link href="/refunds" onClick={() => setSheet(null)}
+            className="flex items-center justify-between py-3 no-underline">
+            <span className="text-[15px] font-semibold text-ink">Refund policy</span>
+            <ChevronRight size={16} className="text-ink-2" />
+          </Link>
+        </SheetWrapper>
+      )}
 
       {/* Sign out confirm */}
       {sheet === 'signout' && (

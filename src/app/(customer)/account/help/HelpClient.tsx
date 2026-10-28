@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowLeft, Phone, Mail, ChevronRight, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
@@ -196,6 +197,13 @@ export function HelpClient({ userId, settings, tickets: initial, orders, isAdmin
               >
                 Send message
               </Button>
+              <p className="text-[12px] text-ink-2 text-center leading-relaxed">
+                See our{' '}
+                <Link href="/refunds" className="text-brand underline-offset-2 hover:underline">
+                  Refund Policy
+                </Link>
+                {' '}for what qualifies for a refund.
+              </p>
             </div>
           </div>
         </>

@@ -219,6 +219,12 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels }: Prop
         <Button onClick={placeOrder} loading={loading} fullWidth size="lg">
           Pay {formatMoney(total)}
         </Button>
+        <p className="text-[12px] text-ink-2 text-center leading-relaxed">
+          By paying you agree to the{' '}
+          <Link href="/terms" className="text-brand underline-offset-2 hover:underline">Terms of Use</Link>
+          {' '}and{' '}
+          <Link href="/refunds" className="text-brand underline-offset-2 hover:underline">Refund Policy</Link>
+        </p>
       </div>
     </div>
   )

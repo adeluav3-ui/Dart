@@ -208,6 +208,13 @@ export function LoginForm() {
             <Button onClick={sendLink} loading={loading} fullWidth size="lg">
               Continue with email
             </Button>
+
+            <p className="text-[12px] text-ink-2 text-center leading-relaxed">
+              By continuing you agree to Dart&apos;s{' '}
+              <Link href="/terms" className="text-brand underline-offset-2 hover:underline">Terms</Link>
+              {' '}and{' '}
+              <Link href="/privacy" className="text-brand underline-offset-2 hover:underline">Privacy Policy</Link>
+            </p>
           </div>
         </div>
       </div>
