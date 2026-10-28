@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 import { HomeClient } from '../HomeClient'
 import type { Vendor, Zone, Area, ZoneFare, FareLevel } from '@/types/database'
 

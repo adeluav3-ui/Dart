@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Complete-profile gate ─────────────────────────────────────────────────
-  const PROFILE_GATED = ['/checkout', '/orders', '/account']
+  const PROFILE_GATED = ['/home', '/checkout', '/orders', '/account']
   if (user && !isCompleteProfile && PROFILE_GATED.some(p => pathname.startsWith(p))) {
     const { data: profile } = await supabase
       .from('profiles')
