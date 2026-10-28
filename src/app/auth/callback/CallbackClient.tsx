@@ -15,24 +15,19 @@ export function CallbackClient({ code, next }: Props) {
     async function handleCallback() {
       const supabase = createClient()
 
-      if (code) {
-        // PKCE flow: exchange the code for a session
-        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code)
-        if (exchangeErr) {
-          setError(exchangeErr.message)
-          return
-        }
-      }
-      // Implicit flow: createBrowserClient detects #access_token=… in the URL
-      // automatically (detectSessionInUrl: true is the default). Give it a tick
-      // to process before we read the user.
-      await new Promise(r => setTimeout(r, 100))
+      // createBrowserClient has detectSessionInUrl: true by default. It auto-detects
+      // ?code= (PKCE) and #access_token= (implicit) and exchanges them on init.
+      // getSession() waits for that initialisation/exchange to settle — do NOT also
+      // call exchangeCodeForSession() manually or the code verifier gets consumed
+      // twice and the second call fails with "PKCE code verifier not found".
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession()
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        window.location.href = '/login'
+      if (sessionErr || !session) {
+        setError(sessionErr?.message ?? 'Sign-in could not be completed. Please try again.')
         return
       }
+
+      const user = session.user
 
       const { data: profile } = await supabase
         .from('profiles')
