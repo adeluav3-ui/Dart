@@ -50,8 +50,8 @@ export default function SplashPage() {
 
     sessionStorage.setItem('dart_splash_seen', '1')
 
+    const nav = setTimeout(go, 1000)
     const fadeOut = setTimeout(() => setPhase('out'), 1200)
-    const nav = setTimeout(go, 1500)
     return () => { clearTimeout(fadeOut); clearTimeout(nav) }
   }, [router])
 
