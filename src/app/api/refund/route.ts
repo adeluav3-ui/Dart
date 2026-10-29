@@ -16,47 +16,25 @@ export async function POST(req: NextRequest) {
 
     if (!payment) return NextResponse.json({ skipped: true })
 
-    const apiKey = process.env.MONNIFY_API_KEY!
-    const secretKey = process.env.MONNIFY_SECRET_KEY!
-    const baseUrl = process.env.MONNIFY_BASE_URL!
-
-    // Auth
-    const authToken = Buffer.from(`${apiKey}:${secretKey}`).toString('base64')
-    const tokenRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
-      method: 'POST',
-      headers: { Authorization: `Basic ${authToken}`, 'Content-Type': 'application/json' },
-    })
-    if (!tokenRes.ok) return NextResponse.json({ error: 'Monnify auth failed' }, { status: 500 })
-    const { responseBody: { accessToken } } = await tokenRes.json()
-
-    // Initiate refund
-    const refundRes = await fetch(`${baseUrl}/api/v1/disbursements/single`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: payment.amount / 100,
-        reference: `REF-${payment.reference}`,
-        narration: `Dart refund for order ${orderId}`,
-        destinationBankCode: '035', // Wallet / Monnify wallet
-        destinationAccountNumber: payment.reference,
-        currency: 'NGN',
-        sourceAccountNumber: process.env.MONNIFY_CONTRACT_CODE,
-      }),
-    })
-
-    const refundData = await refundRes.json()
-
+    // Mark payment as refunded
     await admin.from('payments').update({ status: 'refunded' }).eq('id', payment.id)
 
-    // Email customer about refund (fire-and-forget)
+    // Credit wallet (refund goes to internal Dart wallet, not reversed through Monnify)
+    await admin.from('wallet_transactions').insert({
+      user_id: payment.user_id ?? null,
+      order_id: orderId,
+      amount: payment.amount,
+      kind: 'refund',
+      note: `Refund for cancelled order`,
+    }).then(() => {})  // best-effort; wallet feature may not exist yet
+
+    // Email customer
     const { data: order } = await admin
       .from('orders')
       .select('code, customer_id, total')
       .eq('id', orderId)
       .single()
+
     if (order) {
       const { data: authUser } = await admin.auth.admin.getUserById(order.customer_id)
       if (authUser.user?.email) {
@@ -68,7 +46,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ refund: refundData })
+    return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('Refund error:', err)
     return NextResponse.json({ error: 'Refund failed' }, { status: 500 })

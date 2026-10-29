@@ -224,6 +224,7 @@ export async function POST(req: NextRequest) {
 
     const monnifyRes = await initMonnifyTransaction({
       reference,
+      orderId: order.id,
       amount: total / 100, // Monnify uses naira
       orderCode: order.code,
       customerPhone: phone,
@@ -246,11 +247,13 @@ export async function POST(req: NextRequest) {
 
 async function initMonnifyTransaction({
   reference,
+  orderId,
   amount,
   orderCode,
   customerPhone,
 }: {
   reference: string
+  orderId: string
   amount: number
   orderCode: string
   customerPhone: string
@@ -290,7 +293,7 @@ async function initMonnifyTransaction({
       paymentReference: reference,
       currencyCode: 'NGN',
       contractCode,
-      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/track/${reference}?confirm=1`,
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/track/${orderId}?confirm=1`,
       paymentMethods: ['CARD', 'ACCOUNT_TRANSFER', 'USSD'],
     }),
   })
