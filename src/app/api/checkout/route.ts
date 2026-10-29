@@ -165,7 +165,14 @@ export async function POST(req: NextRequest) {
     // 6. Generate delivery PIN
     const deliveryPin = String(Math.floor(1000 + Math.random() * 9000))
 
-    // 7. Create order
+    // 7. Generate order code
+    const { data: orderCode, error: codeErr } = await admin.rpc('generate_order_code').single()
+    if (codeErr || !orderCode) {
+      console.error('generate_order_code failed:', codeErr)
+      return NextResponse.json({ error: 'Failed to generate order code' }, { status: 500 })
+    }
+
+    // 8. Create order
     const { data: order, error: orderErr } = await admin
       .from('orders')
       .insert({
@@ -187,7 +194,7 @@ export async function POST(req: NextRequest) {
         commission_amount: commissionAmount,
         rider_pay: riderPay,
         delivery_pin: deliveryPin,
-        code: await admin.rpc('generate_order_code').single().then(r => r.data),
+        code: orderCode,
       })
       .select()
       .single()
@@ -197,12 +204,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
 
-    // 8. Insert order items
+    // 9. Insert order items
     await admin.from('order_items').insert(
       orderItems.map(oi => ({ ...oi, order_id: order.id }))
     )
 
-    // 9. Log initial event
+    // 10. Log initial event
     await admin.from('order_events').insert({
       order_id: order.id,
       from_status: null,
@@ -211,7 +218,7 @@ export async function POST(req: NextRequest) {
       note: 'Order created',
     })
 
-    // 10. Init Monnify payment
+    // 11. Init Monnify payment
     const reference = `DT-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
 
     await admin.from('payments').insert({
