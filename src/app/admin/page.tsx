@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminLiveBoardClient } from './AdminLiveBoardClient'
@@ -9,7 +10,7 @@ export default async function AdminLivePage() {
 
   const staleThreshold = new Date(Date.now() - STALE_MS).toISOString()
 
-  const [{ data: orders }, { data: rawRiders }, { data: areas }] = await Promise.all([
+  const [{ data: orders }, { data: rawRiders }, { data: areas }, { count: unpinnedCount }] = await Promise.all([
     supabase
       .from('orders')
       .select(`
@@ -26,6 +27,7 @@ export default async function AdminLivePage() {
       .eq('is_available', true)
       .gte('location_updated_at', staleThreshold),
     admin.from('areas').select('id, name, lat, lng').eq('status', 'active').not('lat', 'is', null),
+    admin.from('areas').select('*', { count: 'exact', head: true }).is('lat', null),
   ])
 
   // Compute nearest area for each available rider
@@ -66,10 +68,23 @@ export default async function AdminLivePage() {
     .eq('role', 'rider')
 
   return (
-    <AdminLiveBoardClient
-      initialOrders={orders ?? []}
-      riders={allRiders ?? []}
-      availableRiders={availableRiders}
-    />
+    <>
+      {(unpinnedCount ?? 0) > 0 && (
+        <Link
+          href="/admin/areas/pins"
+          className="flex items-center justify-between mb-4 px-4 py-3 rounded-2xl bg-warn-tint border border-warn/20 no-underline"
+        >
+          <span className="text-sm font-semibold text-warn">
+            {unpinnedCount} {unpinnedCount === 1 ? 'area has' : 'areas have'} no GPS pin — &quot;Use my location&quot; won&apos;t work for them
+          </span>
+          <span className="text-sm font-bold text-warn shrink-0 ml-3">Set pins →</span>
+        </Link>
+      )}
+      <AdminLiveBoardClient
+        initialOrders={orders ?? []}
+        riders={allRiders ?? []}
+        availableRiders={availableRiders}
+      />
+    </>
   )
 }

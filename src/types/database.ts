@@ -142,10 +142,24 @@ export interface Area {
   aliases: string[]
   lat: number | null
   lng: number | null
+  accuracy_m: number | null
+  pin_saved_at: string | null
+  pin_saved_by: string | null
   gate_pickup: boolean
   status: AreaStatus
   sort_order: number
   created_at: string
+}
+
+export interface AreaPinHistory {
+  id: string
+  area_id: string
+  lat: number
+  lng: number
+  accuracy_m: number | null
+  saved_at: string
+  saved_by: string | null
+  replaced_at: string
 }
 
 export interface AreaRequest {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
@@ -134,7 +135,16 @@ export default function AdminAreasPage() {
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h2 className="font-heading font-bold text-xl">Delivery Areas</h2>
-        <Button onClick={startAdd} size="md">+ Add area</Button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/areas/pins"
+            className="h-9 px-4 rounded-xl border border-brand bg-brand-tint text-brand font-semibold text-sm flex items-center gap-1.5 no-underline"
+          >
+            <MapPin size={14} />
+            GPS pins
+          </Link>
+          <Button onClick={startAdd} size="md">+ Add area</Button>
+        </div>
       </div>
 
       {/* Add / Edit form */}

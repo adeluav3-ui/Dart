@@ -49,6 +49,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   const [search, setSearch] = useState('')
   const [locating, setLocating] = useState(false)
   const [locError, setLocError] = useState('')
+  const [gpsSuggestedId, setGpsSuggestedId] = useState<string | null>(null)
   const [waitlistArea, setWaitlistArea] = useState<string | null>(null)
   const [waitlistAreaName, setWaitlistAreaName] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
@@ -125,6 +126,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
           )
         } else if (nearest.status === 'active') {
           setLocating(false)
+          setGpsSuggestedId(nearest.id)
           setSelected(nearest.id)
         } else {
           setLocating(false)
@@ -167,6 +169,14 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   function handleContinue() {
     const area = areas.find(a => a.id === selected && a.status === 'active')
     if (!area) return
+    // Log GPS detection result (fire-and-forget, best effort)
+    if (gpsSuggestedId) {
+      supabase.from('location_detection_log').insert({
+        area_id_suggested: gpsSuggestedId,
+        area_id_chosen: selected,
+      }).then(() => {})
+      setGpsSuggestedId(null)
+    }
     onSave(selected, areaDisplayName(area))
   }
 
