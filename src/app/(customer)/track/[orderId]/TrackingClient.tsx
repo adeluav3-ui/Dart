@@ -34,10 +34,9 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [flash, setFlash] = useState(false)
   const [justCompleted, setJustCompleted] = useState<OrderStatus | null>(null)
   const [now, setNow] = useState(Date.now())
-  const [riderName, setRiderName] = useState<string | null>(
-    ((initialOrder as any).profiles as { full_name: string | null } | null)?.full_name ?? null
-  )
-  const [riderPhone, setRiderPhone] = useState<string | null>(null)
+  const initialProfiles = (initialOrder as any).profiles as { full_name: string | null; phone: string | null } | null
+  const [riderName, setRiderName] = useState<string | null>(initialProfiles?.full_name ?? null)
+  const [riderPhone, setRiderPhone] = useState<string | null>(initialProfiles?.phone ?? null)
   const prevStatusRef = useRef<OrderStatus>(initialOrder.status as OrderStatus)
   const prevRiderIdRef = useRef<string | null>((initialOrder as any).rider_id ?? null)
   const supabase = createClient()

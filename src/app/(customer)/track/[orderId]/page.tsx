@@ -28,12 +28,12 @@ export default async function TrackPage({
 
   // Fetch rider name via admin client — orders.rider_id references riders (not profiles directly)
   // and customers can't read the riders table via RLS
-  let riderProfile: { full_name: string | null } | null = null
+  let riderProfile: { full_name: string | null; phone: string | null } | null = null
   if ((order as any).rider_id) {
     const admin = createAdminClient()
     const { data: rp } = await admin
       .from('profiles')
-      .select('full_name')
+      .select('full_name, phone')
       .eq('id', (order as any).rider_id)
       .single()
     riderProfile = rp
