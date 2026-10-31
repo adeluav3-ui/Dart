@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Lock, Info, Trash2 } from 'lucide-react'
@@ -36,6 +36,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
   const [error, setError] = useState('')
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const submittingRef = useRef(false)
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -68,6 +69,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
   const activeAreas = areas.filter(a => a.status === 'active')
 
   async function placeOrder() {
+    if (submittingRef.current) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       router.push(`/login?redirect=${encodeURIComponent('/checkout')}`)
@@ -77,26 +79,31 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
     if (!isGatePickup && !landmark.trim()) { setError('Landmark is required'); return }
     if (!phone.trim()) { setError('Enter a phone number for the rider to call'); return }
 
+    submittingRef.current = true
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cart,
-        customerAreaId,
-        landmark: landmark.trim(),
-        details: details.trim() || null,
-        phone: phone.trim(),
-      }),
-    })
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart,
+          customerAreaId,
+          landmark: landmark.trim(),
+          details: details.trim() || null,
+          phone: phone.trim(),
+        }),
+      })
 
-    const json = await res.json()
-    setLoading(false)
+      const json = await res.json()
 
-    if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
-    if (json.checkoutUrl) { clearCart(); window.location.href = json.checkoutUrl }
+      if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
+      if (json.checkoutUrl) { clearCart(); window.location.href = json.checkoutUrl }
+    } finally {
+      setLoading(false)
+      submittingRef.current = false
+    }
   }
 
   return (

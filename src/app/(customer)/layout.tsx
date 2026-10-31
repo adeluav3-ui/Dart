@@ -8,8 +8,8 @@ import { CartUserGuard } from '@/components/CartUserGuard'
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // Splash screen renders full-screen with no shell
-  if (pathname === '/') return <>{children}</>
+  // Splash screen and tracking page render full-screen with no shell
+  if (pathname === '/' || pathname.startsWith('/track/')) return <>{children}</>
 
   return (
     <>

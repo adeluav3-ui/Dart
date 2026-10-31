@@ -141,12 +141,19 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
 
   async function transition(orderId: string, toStatus: OrderStatus, extra?: Record<string, unknown>) {
     setLoading(orderId)
-    await fetch(`/api/orders/${orderId}/transition`, {
+    const res = await fetch(`/api/orders/${orderId}/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ toStatus, ...extra }),
     })
     setLoading(null)
+    if (res.ok) {
+      setOrders(prev => prev.map(o =>
+        o.id === orderId
+          ? { ...o, status: toStatus, ...(extra?.prepMins ? { prep_mins: Number(extra.prepMins) } : {}) }
+          : o
+      ))
+    }
   }
 
   async function loadAvailableRiders() {
