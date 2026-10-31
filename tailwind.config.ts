@@ -52,11 +52,27 @@ const config: Config = {
           '80%': { transform: 'scale(1.4)', opacity: '1' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
+        'status-in': {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'check-pop': {
+          '0%': { transform: 'scale(0)', opacity: '0' },
+          '65%': { transform: 'scale(1.3)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'flash-fade': {
+          '0%': { opacity: '0.45' },
+          '100%': { opacity: '0' },
+        },
       },
       animation: {
         'splash-logo': 'splash-logo 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
         'splash-text': 'splash-text 0.6s ease-out 0.55s both',
         'splash-dot': 'splash-dot 0.5s ease-out 0.65s both',
+        'status-in': 'status-in 0.4s ease-out',
+        'check-pop': 'check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'flash-fade': 'flash-fade 0.8s ease-out forwards',
       },
     },
   },

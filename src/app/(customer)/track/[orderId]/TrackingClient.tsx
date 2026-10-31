@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { X, Phone, Info } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, formatMoney } from '@/lib/format'
-import type { Order, OrderEvent, OrderItem, OrderStatus } from '@/types/database'
+import type { OrderEvent, OrderItem, OrderStatus } from '@/types/database'
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending_payment: 'Awaiting payment',
@@ -31,11 +31,21 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [order, setOrder] = useState<Record<string, unknown>>(initialOrder)
   const [events, setEvents] = useState<OrderEvent[]>(initialEvents)
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
+  const [flash, setFlash] = useState(false)
+  const [justCompleted, setJustCompleted] = useState<OrderStatus | null>(null)
+  const [now, setNow] = useState(Date.now())
+  const prevStatusRef = useRef<OrderStatus>(initialOrder.status as OrderStatus)
   const supabase = createClient()
 
   const status = order.status as OrderStatus
   const vendor = order.vendors as { name: string; cover_photo_url: string | null } | null
   const rider = order.profiles as { full_name: string | null } | null
+
+  // Clock tick for prep countdown
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 10_000)
+    return () => clearInterval(t)
+  }, [])
 
   // Real-time subscription
   useEffect(() => {
@@ -44,7 +54,15 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` },
-        payload => setOrder(prev => ({ ...prev, ...payload.new }))
+        payload => {
+          const newStatus = payload.new.status as OrderStatus | undefined
+          if (newStatus && newStatus !== prevStatusRef.current) {
+            setJustCompleted(prevStatusRef.current)
+            prevStatusRef.current = newStatus
+            setFlash(true)
+          }
+          setOrder(prev => ({ ...prev, ...payload.new }))
+        }
       )
       .on(
         'postgres_changes',
@@ -56,41 +74,64 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
     return () => { supabase.removeChannel(channel) }
   }, [order.id])
 
+  // Clear flash after animation completes
+  useEffect(() => {
+    if (!flash) return
+    const t = setTimeout(() => setFlash(false), 900)
+    return () => clearTimeout(t)
+  }, [flash])
+
+  // Clear justCompleted after checkmark animation
+  useEffect(() => {
+    if (!justCompleted) return
+    const t = setTimeout(() => setJustCompleted(null), 500)
+    return () => clearTimeout(t)
+  }, [justCompleted])
+
+  const isProblem = status === 'cancelled' || status === 'expired'
+  const isActive = !isProblem && status !== 'delivered'
+
+  const prepMinsLeft = (status === 'accepted' && order.prep_mins && order.accepted_at)
+    ? Math.max(0, (order.prep_mins as number) - Math.floor((now - new Date(order.accepted_at as string).getTime()) / 60000))
+    : null
+
   const headlineMap: Partial<Record<OrderStatus, string>> = {
     pending_payment: isConfirmRedirect ? 'Confirming payment…' : 'Awaiting payment',
     paid: 'Order confirmed!',
     accepted: 'Kitchen is cooking',
     ready: 'Ready for pickup',
-    picked_up: 'Your rider is on the way',
+    picked_up: 'Rider is on the way',
     delivered: 'Delivered!',
     cancelled: 'Order cancelled',
     expired: 'Order expired',
   }
 
   const subtitleMap: Partial<Record<OrderStatus, string>> = {
-    pending_payment: isConfirmRedirect ? 'This updates automatically — no need to refresh.' : 'Waiting for payment to be confirmed.',
+    pending_payment: isConfirmRedirect
+      ? 'Updates automatically — no need to refresh'
+      : 'Waiting for payment to be confirmed.',
     paid: 'The kitchen will accept shortly.',
-    accepted: order.prep_mins ? `Ready in about ${order.prep_mins} min` : 'Being prepared now',
+    accepted: prepMinsLeft != null
+      ? prepMinsLeft > 0 ? `Ready in about ${prepMinsLeft} min` : 'Should be ready any moment'
+      : 'Being prepared now',
     ready: 'Rider will pick up soon',
     picked_up: 'Arriving soon',
     delivered: 'Enjoy your order!',
   }
 
-  const isProblem = status === 'cancelled' || status === 'expired'
-
-  // Build timeline
   const timelineSteps = HAPPY_PATH.map((s, i) => {
     const event = events.find(e => e.to_status === s)
     const statusIdx = HAPPY_PATH.indexOf(status)
-    const stepIdx = i
-    const isDone = stepIdx < statusIdx || status === 'delivered'
-    const isCurrent = stepIdx === statusIdx && !isProblem
-    const isTodo = stepIdx > statusIdx
+    const isDone = i < statusIdx || status === 'delivered'
+    const isCurrent = i === statusIdx && !isProblem
+    const isTodo = i > statusIdx
 
     return {
       status: s,
       label: STATUS_LABELS[s],
-      time: event ? formatTime(event.created_at) : (s === 'accepted' && order.prep_mins ? `Ready in ${order.prep_mins} min` : isCurrent ? 'Now' : ''),
+      time: event
+        ? formatTime(event.created_at)
+        : isCurrent ? 'Now' : '',
       isDone,
       isCurrent,
       isTodo,
@@ -102,8 +143,16 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-body text-ink">
-      {/* Header */}
-      <div className={`px-5 pt-4 pb-6 flex flex-col gap-1.5 ${isProblem ? 'bg-danger' : 'bg-brand'} text-white`}>
+
+      {/* ── Header ── */}
+      <div className={`relative px-5 pt-4 pb-6 flex flex-col gap-1.5 overflow-hidden transition-colors duration-700 ${isProblem ? 'bg-danger' : 'bg-brand'} text-white`}>
+
+        {/* Flash overlay on status change */}
+        {flash && (
+          <span className="absolute inset-0 bg-white pointer-events-none animate-flash-fade" />
+        )}
+
+        {/* Order ref + close */}
         <div className="flex justify-between items-center">
           <span className="text-[13px] font-semibold text-white/80">
             Order {order.code as string} · {vendor?.name}
@@ -112,17 +161,40 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
             <X size={20} strokeWidth={2.2} stroke="white" />
           </Link>
         </div>
-        <h1 className="font-heading font-extrabold text-[30px] leading-tight">
-          {headlineMap[status] ?? STATUS_LABELS[status]}
+
+        {/* LIVE badge */}
+        {isActive && (
+          <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-widest text-white/60 uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            Live
+          </span>
+        )}
+
+        {/* Headline — re-mounts on each status change to animate in */}
+        <h1 key={status} className="font-heading font-extrabold text-[30px] leading-tight animate-status-in">
+          {status === 'pending_payment' && isConfirmRedirect ? (
+            <span className="flex items-center gap-3">
+              <svg className="animate-spin shrink-0" width="28" height="28" viewBox="0 0 24 24"
+                fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Confirming payment…
+            </span>
+          ) : (
+            headlineMap[status] ?? STATUS_LABELS[status]
+          )}
         </h1>
+
         {subtitleMap[status] && (
-          <span className="text-[15px] text-white/80">{subtitleMap[status]}</span>
+          <span key={`sub-${status}`} className="text-[15px] text-white/80 animate-status-in">
+            {subtitleMap[status]}
+          </span>
         )}
       </div>
 
-      {/* Delivery PIN card */}
+      {/* ── Delivery PIN card ── */}
       {(status === 'picked_up' || status === 'ready') && deliveryPin && (
-        <div className="mx-4 -mt-3 bg-white border border-line rounded-2xl px-4 py-3.5 flex items-center justify-between">
+        <div className="mx-4 -mt-3 bg-white border border-line rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm">
           <span className="flex flex-col gap-0.5">
             <span className="text-[13px] font-bold">Delivery PIN</span>
             <span className="text-xs text-ink-2 leading-snug max-w-[170px]">Tell the rider only when the food is in your hand</span>
@@ -137,7 +209,7 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
         </div>
       )}
 
-      {/* Rider card */}
+      {/* ── Rider card ── */}
       {rider && status === 'picked_up' && (
         <div className="mx-4 mt-3.5 bg-canvas rounded-2xl px-4 py-3 flex items-center gap-3">
           <span className="w-11 h-11 rounded-full bg-ink text-white flex items-center justify-center font-bold text-sm">
@@ -157,26 +229,44 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
         </div>
       )}
 
-      {/* Timeline */}
+      {/* ── Timeline ── */}
       <ol aria-label="Order progress" className="list-none m-0 pt-5 px-5 flex flex-col">
         {timelineSteps.map(step => (
           <li key={step.status} className="flex gap-3.5 min-h-[60px]">
+
+            {/* Step indicator column */}
             <span className="flex flex-col items-center w-6 flex-none">
+
               {step.isDone && (
-                <span className="w-6 h-6 rounded-full bg-brand flex items-center justify-center">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                <span
+                  key={`done-${step.status}-${justCompleted === step.status}`}
+                  className={`w-6 h-6 rounded-full bg-brand flex items-center justify-center ${justCompleted === step.status ? 'animate-check-pop' : ''}`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
                 </span>
               )}
+
               {step.isCurrent && (
-                <span className="w-6 h-6 rounded-full border-[7px] border-brand bg-white" />
+                <span className="relative w-6 h-6 flex items-center justify-center">
+                  <span className="animate-ping absolute w-6 h-6 rounded-full bg-brand opacity-25" />
+                  <span className="relative w-6 h-6 rounded-full border-[7px] border-brand bg-white" />
+                </span>
               )}
+
               {step.isTodo && (
                 <span className="w-6 h-6 rounded-full border-2 border-[#C3C8CD]" />
               )}
+
+              {/* Connecting line */}
               {step.hasLine && (
-                <span className={`flex-1 w-0.5 ${step.isDone ? 'bg-brand' : 'bg-[#E1E4E7]'}`} />
+                <span className={`flex-1 w-0.5 mt-1 transition-colors duration-700 ${step.isDone ? 'bg-brand' : 'bg-[#E1E4E7]'}`} />
               )}
             </span>
+
+            {/* Step text */}
             <span className="flex flex-col gap-0.5 pt-0.5 pb-3.5">
               <span className={`text-[15px] ${step.isTodo ? 'font-medium text-ink-2' : 'font-bold'}`}>
                 {step.label}
@@ -184,12 +274,18 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
               {step.time && (
                 <span className="text-[13px] text-ink-2">{step.time}</span>
               )}
+              {/* Live prep countdown */}
+              {step.isCurrent && step.status === 'accepted' && prepMinsLeft != null && (
+                <span className="text-[13px] text-brand font-semibold">
+                  {prepMinsLeft > 0 ? `~${prepMinsLeft} min remaining` : 'Almost ready'}
+                </span>
+              )}
             </span>
           </li>
         ))}
       </ol>
 
-      {/* Order items */}
+      {/* ── Order items ── */}
       <div className="mx-4 mt-2 mb-4 bg-canvas rounded-2xl p-4 flex flex-col gap-2">
         <h2 className="text-[15px] font-bold">Your order</h2>
         {orderItems.map(oi => (
@@ -235,7 +331,7 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
         </div>
       </div>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <div className="mt-auto px-5 py-4 border-t border-line flex justify-between items-center">
         <span className="text-sm text-ink-2">Problem with this order?</span>
         <a href="tel:" className="min-h-btn-sm flex items-center text-sm font-bold text-brand">Call support</a>
