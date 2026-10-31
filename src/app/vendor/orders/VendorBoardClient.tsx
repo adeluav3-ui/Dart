@@ -23,6 +23,7 @@ interface AvailableRider {
   nearestArea: string
   distanceLabel: string
   locationAgeLabel: string
+  locationFresh: boolean
   hasOrderFromVendor: boolean
 }
 
@@ -489,8 +490,10 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
                     ) : availableRiders.length === 0 ? (
                       <p className="text-[13px] text-ink-2 text-center py-2">No riders available right now</p>
                     ) : (
-                      <div className="flex flex-col gap-2">
-                        {availableRiders.map(r => (
+                      (() => {
+                        const fresh = availableRiders.filter(r => r.locationFresh)
+                        const stale = availableRiders.filter(r => !r.locationFresh)
+                        const RiderRow = (r: AvailableRider) => (
                           <div key={r.id} className="flex items-start gap-2 py-2 border-b border-line last:border-0">
                             <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -501,18 +504,26 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[12px] text-ink-2">
-                                {r.nearestArea || '—'} · {r.distanceLabel} · {r.locationAgeLabel}
-                              </span>
+                              {r.locationFresh ? (
+                                <span className="text-[12px] text-ink-2">
+                                  {r.nearestArea || '—'} · {r.distanceLabel} · {r.locationAgeLabel}
+                                </span>
+                              ) : (
+                                <span className="text-[12px] text-ink-2">{r.locationAgeLabel}</span>
+                              )}
                             </div>
                             <div className="flex gap-1.5 shrink-0">
-                              {r.phone && (
+                              {r.phone ? (
                                 <a
                                   href={`tel:${r.phone}`}
                                   className="h-9 px-3 rounded-xl border border-line text-sm font-semibold text-ink-2 flex items-center no-underline"
                                 >
                                   Call
                                 </a>
+                              ) : (
+                                <span className="h-9 px-3 rounded-xl border border-line text-sm font-semibold text-ink-2/40 flex items-center">
+                                  No phone
+                                </span>
                               )}
                               <button
                                 type="button"
@@ -523,8 +534,28 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
                               </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        )
+                        return (
+                          <div className="flex flex-col gap-0">
+                            {fresh.length > 0 && (
+                              <>
+                                <p className="text-[11px] font-bold text-ink-2 uppercase tracking-wide py-1.5">
+                                  Fresh location · {fresh.length}
+                                </p>
+                                {fresh.map(RiderRow)}
+                              </>
+                            )}
+                            {stale.length > 0 && (
+                              <>
+                                <p className="text-[11px] font-bold text-ink-2 uppercase tracking-wide py-1.5 mt-2">
+                                  Location unknown · {stale.length} — call to confirm
+                                </p>
+                                {stale.map(RiderRow)}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })()
                     )}
 
                     <button

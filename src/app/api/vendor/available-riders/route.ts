@@ -48,13 +48,12 @@ export async function GET(req: NextRequest) {
     vendorLng = area?.lng ?? null
   }
 
-  // Fetch available riders with profile info
+  // Fetch ALL active riders — fresh and stale alike
   const staleThreshold = new Date(Date.now() - STALE_MS).toISOString()
   const { data: rawRiders } = await admin
     .from('riders')
-    .select('id, lat, lng, location_accuracy, location_updated_at, profiles(full_name, phone)')
-    .eq('is_available', true)
-    .gte('location_updated_at', staleThreshold)
+    .select('id, lat, lng, location_accuracy, location_updated_at, is_available, profiles(full_name, phone)')
+    .eq('is_active', true)
 
   if (!rawRiders || rawRiders.length === 0) {
     return NextResponse.json({ riders: [] })
@@ -83,11 +82,13 @@ export async function GET(req: NextRequest) {
     lng: number | null
     location_accuracy: number | null
     location_updated_at: string | null
+    is_available: boolean
     profiles: { full_name: string | null; phone: string | null } | { full_name: string | null; phone: string | null }[] | null
   }
 
   const riders = (rawRiders as unknown as RiderRow[]).map(r => {
     const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+    const locationFresh = !!r.location_updated_at && r.location_updated_at >= staleThreshold
 
     let distanceM: number | null = null
     let distanceLabel = '—'
@@ -96,7 +97,6 @@ export async function GET(req: NextRequest) {
       distanceLabel = formatDistance(distanceM)
     }
 
-    // Find nearest named area to rider's pin
     let nearestArea = ''
     if (r.lat != null && r.lng != null && allAreas) {
       let minDist = Infinity
@@ -114,19 +114,21 @@ export async function GET(req: NextRequest) {
       nearestArea,
       distanceM,
       distanceLabel,
-      locationAgeLabel: r.location_updated_at ? formatLocationAge(r.location_updated_at) : '—',
+      locationAgeLabel: r.location_updated_at ? formatLocationAge(r.location_updated_at) : 'Location unknown',
+      locationFresh,
       hasOrderFromVendor: vendorActiveRiderIds.has(r.id),
-      lat: r.lat,
-      lng: r.lng,
     }
   })
 
-  // Sort: riders with vendor orders first (for batching), then by distance
+  // Fresh-location riders first (sub-sorted: vendor order first, then distance)
+  // Unknown-location riders after (sub-sorted: vendor order first, then name)
   riders.sort((a, b) => {
+    if (a.locationFresh !== b.locationFresh) return a.locationFresh ? -1 : 1
     if (a.hasOrderFromVendor !== b.hasOrderFromVendor) return a.hasOrderFromVendor ? -1 : 1
-    const dA = a.distanceM ?? Infinity
-    const dB = b.distanceM ?? Infinity
-    return dA - dB
+    if (a.locationFresh && b.locationFresh) {
+      return (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity)
+    }
+    return a.name.localeCompare(b.name)
   })
 
   return NextResponse.json({ riders })

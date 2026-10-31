@@ -159,6 +159,32 @@ export function RiderJobClient({
     return () => clearInterval(t)
   }, [])
 
+  // Keep location fresh while job is active — same cadence as the jobs list page
+  useEffect(() => {
+    const ACTIVE = ['accepted', 'ready', 'picked_up']
+    if (!ACTIVE.includes(order.status)) return
+    if (!navigator.geolocation) return
+
+    const push = () => {
+      navigator.geolocation.getCurrentPosition(pos => {
+        fetch('/api/rider/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            available: true,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+        }).catch(() => {})
+      }, () => {}, { timeout: 10_000, maximumAge: 60_000 })
+    }
+
+    push() // immediate update on mount / status change
+    const t = setInterval(push, 2 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [order.status])
+
   // Realtime order updates
   useEffect(() => {
     const client = supabaseRef.current
