@@ -34,12 +34,17 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [flash, setFlash] = useState(false)
   const [justCompleted, setJustCompleted] = useState<OrderStatus | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [riderName, setRiderName] = useState<string | null>(
+    ((initialOrder as any).profiles as { full_name: string | null } | null)?.full_name ?? null
+  )
+  const [riderPhone, setRiderPhone] = useState<string | null>(null)
   const prevStatusRef = useRef<OrderStatus>(initialOrder.status as OrderStatus)
+  const prevRiderIdRef = useRef<string | null>((initialOrder as any).rider_id ?? null)
   const supabase = createClient()
 
   const status = order.status as OrderStatus
   const vendor = order.vendors as { name: string; cover_photo_url: string | null } | null
-  const rider = order.profiles as { full_name: string | null } | null
+  const riderId = (order as any).rider_id as string | null
 
   // Clock tick for prep countdown
   useEffect(() => {
@@ -60,6 +65,17 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
             setJustCompleted(prevStatusRef.current)
             prevStatusRef.current = newStatus
             setFlash(true)
+          }
+          const newRiderId = payload.new.rider_id as string | null | undefined
+          if (newRiderId && newRiderId !== prevRiderIdRef.current) {
+            prevRiderIdRef.current = newRiderId
+            fetch(`/api/orders/${order.id}/rider`)
+              .then(r => r.json())
+              .then(({ name, phone }: { name: string | null; phone: string | null }) => {
+                setRiderName(name)
+                setRiderPhone(phone)
+              })
+              .catch(() => {})
           }
           setOrder(prev => ({ ...prev, ...payload.new }))
         }
@@ -209,23 +225,27 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
         </div>
       )}
 
-      {/* ── Rider card ── */}
-      {rider && status === 'picked_up' && (
-        <div className="mx-4 mt-3.5 bg-canvas rounded-2xl px-4 py-3 flex items-center gap-3">
-          <span className="w-11 h-11 rounded-full bg-ink text-white flex items-center justify-center font-bold text-sm">
-            {rider.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? '??'}
+      {/* ── Rider card — shown as soon as a rider is assigned ── */}
+      {riderId && (status === 'accepted' || status === 'ready' || status === 'picked_up') && (
+        <div className="mx-4 mt-3.5 bg-canvas rounded-2xl px-4 py-3 flex items-center gap-3 animate-status-in">
+          <span className="w-11 h-11 rounded-full bg-ink text-white flex items-center justify-center font-bold text-sm shrink-0">
+            {riderName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? '🛵'}
           </span>
-          <span className="flex-1 flex flex-col">
-            <span className="text-[15px] font-bold">{rider.full_name ?? 'Your rider'}</span>
-            <span className="text-[13px] text-ink-2">Your rider</span>
+          <span className="flex-1 flex flex-col min-w-0">
+            <span className="text-[15px] font-bold truncate">{riderName ?? 'Rider assigned'}</span>
+            <span className="text-[13px] text-ink-2">
+              {status === 'picked_up' ? 'On the way to you' : 'Will pick up your order'}
+            </span>
           </span>
-          <a
-            href={`tel:${order.address_phone}`}
-            aria-label="Call rider"
-            className="w-11 h-11 rounded-full bg-brand flex items-center justify-center"
-          >
-            <Phone size={20} stroke="white" strokeWidth={2} />
-          </a>
+          {riderPhone && (
+            <a
+              href={`tel:${riderPhone}`}
+              aria-label="Call rider"
+              className="w-11 h-11 rounded-full bg-brand flex items-center justify-center shrink-0"
+            >
+              <Phone size={20} stroke="white" strokeWidth={2} />
+            </a>
+          )}
         </div>
       )}
 
