@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { X, Phone, Info } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -39,7 +39,7 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [riderPhone, setRiderPhone] = useState<string | null>(initialProfiles?.phone ?? null)
   const prevStatusRef = useRef<OrderStatus>(initialOrder.status as OrderStatus)
   const prevRiderIdRef = useRef<string | null>((initialOrder as any).rider_id ?? null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const status = order.status as OrderStatus
   const vendor = order.vendors as { name: string; cover_photo_url: string | null } | null
@@ -88,6 +88,57 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
 
     return () => { supabase.removeChannel(channel) }
   }, [order.id])
+
+  // Polling fallback — fires every 5 s for active orders so the page
+  // updates even when Supabase Realtime isn't configured for this table
+  useEffect(() => {
+    const TERMINAL: OrderStatus[] = ['delivered', 'cancelled', 'expired']
+    if (TERMINAL.includes(prevStatusRef.current)) return
+
+    const poll = setInterval(async () => {
+      if (TERMINAL.includes(prevStatusRef.current)) { clearInterval(poll); return }
+
+      const { data: fresh } = await supabase
+        .from('orders')
+        .select('status, rider_id, prep_mins, accepted_at, ready_at, picked_up_at, delivered_at, paid_at')
+        .eq('id', order.id as string)
+        .single()
+
+      if (!fresh) return
+
+      // Rider assigned while polling
+      const newRiderId = fresh.rider_id as string | null
+      if (newRiderId && newRiderId !== prevRiderIdRef.current) {
+        prevRiderIdRef.current = newRiderId
+        fetch(`/api/orders/${order.id}/rider`)
+          .then(r => r.json())
+          .then(({ name, phone }: { name: string | null; phone: string | null }) => {
+            setRiderName(name)
+            setRiderPhone(phone)
+          })
+          .catch(() => {})
+      }
+
+      const freshStatus = fresh.status as OrderStatus
+      if (freshStatus !== prevStatusRef.current) {
+        // Fetch updated events too
+        const { data: newEvents } = await supabase
+          .from('order_events')
+          .select('*')
+          .eq('order_id', order.id as string)
+          .order('created_at')
+        if (newEvents) setEvents(newEvents)
+
+        setJustCompleted(prevStatusRef.current)
+        prevStatusRef.current = freshStatus
+        setFlash(true)
+      }
+
+      setOrder(prev => ({ ...prev, ...fresh }))
+    }, 5000)
+
+    return () => clearInterval(poll)
+  }, []) // intentionally empty — uses refs for current values
 
   // Clear flash after animation completes
   useEffect(() => {
