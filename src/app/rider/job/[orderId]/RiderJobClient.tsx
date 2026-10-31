@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Phone, Map } from 'lucide-react'
+import { Phone, Map, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney, formatTime } from '@/lib/format'
 
@@ -254,6 +255,10 @@ export function RiderJobClient({
       <div className="min-h-screen bg-canvas font-body text-ink flex flex-col">
         {/* Dark header */}
         <div className="bg-ink flex flex-col" style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
+          <Link href="/rider/jobs" className="flex items-center gap-1 px-3 pt-1 pb-0 text-white/60 no-underline w-fit">
+            <ArrowLeft size={18} strokeWidth={2} />
+            <span className="text-[13px] font-medium">Jobs</span>
+          </Link>
           <div className="flex items-start justify-between px-4 pb-1">
             <div>
               <p className="text-[11px] text-white/50 font-medium tracking-wide mb-0.5">{order.code} · Step 1 of 2</p>
@@ -360,9 +365,13 @@ export function RiderJobClient({
     if (order.is_gate_pickup && arrivedAt) {
       return (
         <div className="min-h-screen bg-canvas font-body text-ink flex flex-col">
-          <div className="bg-ink px-4 pb-4" style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
-            <p className="text-[11px] text-white/50 font-medium tracking-wide mb-0.5">{order.code} · Gate pickup</p>
-            <p className="font-heading font-extrabold text-[20px] text-white leading-tight">Waiting at {customerArea}</p>
+          <div className="bg-ink pb-4" style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
+            <Link href="/rider/jobs" className="flex items-center gap-1 px-3 pt-1 pb-1 text-white/60 no-underline w-fit">
+              <ArrowLeft size={18} strokeWidth={2} />
+              <span className="text-[13px] font-medium">Jobs</span>
+            </Link>
+            <p className="text-[11px] text-white/50 font-medium tracking-wide mb-0.5 px-4">{order.code} · Gate pickup</p>
+            <p className="font-heading font-extrabold text-[20px] text-white leading-tight px-4">Waiting at {customerArea}</p>
           </div>
 
           <div className="px-4 py-4 flex flex-col gap-3 flex-1">
@@ -445,6 +454,10 @@ export function RiderJobClient({
     return (
       <div className="min-h-screen bg-canvas font-body text-ink flex flex-col">
         <div className="bg-ink flex flex-col" style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
+          <Link href="/rider/jobs" className="flex items-center gap-1 px-3 pt-1 pb-0 text-white/60 no-underline w-fit">
+            <ArrowLeft size={18} strokeWidth={2} />
+            <span className="text-[13px] font-medium">Jobs</span>
+          </Link>
           <div className="flex items-start justify-between px-4 pb-1">
             <div>
               <p className="text-[11px] text-white/50 font-medium tracking-wide mb-0.5">{order.code} · Step 2 of 2</p>

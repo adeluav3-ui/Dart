@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { TrackingClient } from './TrackingClient'
 
@@ -18,13 +19,27 @@ export default async function TrackPage({
     .from('orders')
     .select(`
       *,
-      vendors (name, cover_photo_url),
-      profiles!orders_rider_id_fkey (full_name)
+      vendors (name, cover_photo_url)
     `)
     .eq('id', params.orderId)
     .single()
 
   if (!order) notFound()
+
+  // Fetch rider name via admin client — orders.rider_id references riders (not profiles directly)
+  // and customers can't read the riders table via RLS
+  let riderProfile: { full_name: string | null } | null = null
+  if ((order as any).rider_id) {
+    const admin = createAdminClient()
+    const { data: rp } = await admin
+      .from('profiles')
+      .select('full_name')
+      .eq('id', (order as any).rider_id)
+      .single()
+    riderProfile = rp
+  }
+
+  const orderWithRider = { ...order, profiles: riderProfile }
 
   const { data: events } = await supabase
     .from('order_events')
@@ -39,7 +54,7 @@ export default async function TrackPage({
 
   return (
     <TrackingClient
-      initialOrder={order}
+      initialOrder={orderWithRider}
       initialEvents={events ?? []}
       orderItems={items ?? []}
       isConfirmRedirect={searchParams.confirm === '1'}
