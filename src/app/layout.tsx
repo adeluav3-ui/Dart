@@ -32,6 +32,7 @@ export const viewport: Viewport = {
 }
 
 import { NavigationProgress } from '@/components/NavigationProgress'
+import { SplashScreen } from '@/components/SplashScreen'
 
 export default function RootLayout({
   children,
@@ -41,6 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <SplashScreen />
         <NavigationProgress />
         {children}
       </body>

@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 
 export default function HomeLoading() {
   return (
-    <div className="min-h-dvh bg-white"
+    <div className="min-h-dvh bg-canvas"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
 
       {/* Header */}
