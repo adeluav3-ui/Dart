@@ -259,7 +259,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
           </div>
           {feeInfoOpen && (
             <p className="text-[12px] text-ink-2 bg-surface rounded-xl px-3 py-2 leading-relaxed">
-              Helps us run Dart: payments, support and refunds.
+              Helps us run GoCart: payments, support and refunds.
             </p>
           )}
           <div className="h-px bg-line my-1" />
@@ -274,7 +274,7 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
         <div className="flex gap-2 items-start">
           <Lock size={16} stroke="#0B7A47" strokeWidth={2} className="flex-none mt-0.5" />
           <span className="text-xs leading-snug text-ink-2">
-            Card, transfer or USSD. The kitchen starts cooking only after your payment is confirmed; if they can&apos;t take the order, you&apos;re refunded to your Dart wallet.
+            Card, transfer or USSD. The kitchen starts cooking only after your payment is confirmed; if they can&apos;t take the order, you&apos;re refunded to your GoCart wallet.
           </span>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}

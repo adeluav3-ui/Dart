@@ -37,7 +37,7 @@ export function WalletClient({ balance, entries }: Props) {
         <div className="bg-brand rounded-2xl p-5 overflow-hidden relative">
           {/* Watermark circle */}
           <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full border-[20px] border-white/10 pointer-events-none" />
-          <p className="text-[13px] font-semibold text-white/80 mb-1">Dart credit</p>
+          <p className="text-[13px] font-semibold text-white/80 mb-1">GoCart credit</p>
           <p className="font-heading font-extrabold text-[40px] text-white leading-none mb-1">
             {formatMoney(balance)}
           </p>

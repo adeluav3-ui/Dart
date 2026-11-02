@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { DartLogo } from '@/components/ui/DartLogo'
+import { Logo } from '@/components/ui/Logo'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
@@ -149,11 +149,11 @@ export function LoginForm() {
 
         <div className="flex-1 flex flex-col px-6 pt-4 pb-8 gap-8">
           <div className="flex flex-col items-center gap-1 pt-2">
-            <DartLogo />
+            <Logo height={28} />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <h1 className="font-heading font-extrabold text-[28px] text-ink">Sign in to Dart</h1>
+            <h1 className="font-heading font-extrabold text-[28px] text-ink">Sign in to GoCart</h1>
             <p className="text-[15px] text-ink-2 leading-relaxed">
               Save your addresses, track your orders and check out faster.
             </p>
@@ -210,7 +210,7 @@ export function LoginForm() {
             </Button>
 
             <p className="text-[12px] text-ink-2 text-center leading-relaxed">
-              By continuing you agree to Dart&apos;s{' '}
+              By continuing you agree to GoCart&apos;s{' '}
               <Link href="/terms" className="text-brand underline-offset-2 hover:underline">Terms</Link>
               {' '}and{' '}
               <Link href="/privacy" className="text-brand underline-offset-2 hover:underline">Privacy Policy</Link>

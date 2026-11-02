@@ -68,7 +68,7 @@ export function SellPageClient({ areas }: { areas: Area[] }) {
         <Link href="/" className="w-9 h-9 rounded-full bg-surface flex items-center justify-center">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="font-heading font-bold text-[18px]">Sell on Dart</h1>
+        <h1 className="font-heading font-bold text-[18px]">Sell on GoCart</h1>
       </header>
 
       <div className="px-4 pt-4 flex flex-col gap-4">

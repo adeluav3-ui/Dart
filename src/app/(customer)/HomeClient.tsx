@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck } from 'lucide-react'
-import { DartLogo } from '@/components/ui/DartLogo'
+import { Logo } from '@/components/ui/Logo'
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
 import { AreaPicker } from '@/components/AreaPicker'
 import { formatMoney, areaDisplayName } from '@/lib/format'
@@ -93,7 +93,7 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
           className="flex items-center justify-between px-4 pt-4 pb-1"
           style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
         >
-          <DartLogo />
+          <Logo height={28} />
           <Link
             href="/checkout"
             className="relative w-11 h-11 rounded-full border border-line bg-white flex items-center justify-center"

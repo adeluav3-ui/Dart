@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import { formatMoney, formatTime } from '@/lib/format'
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
-const FROM = 'Dart Delivery <orders@dartdelivery.ng>'
+const FROM = 'GoCart <orders@gocart.app>'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,7 +145,7 @@ export async function sendRefundEmail({
     html: html(`
       <h2>Refund processed</h2>
       <p>Order <strong>${orderCode}</strong> was cancelled.</p>
-      <p><strong>${formatMoney(amount)}</strong> has been added to your Dart wallet and will appear on your next order.</p>
+      <p><strong>${formatMoney(amount)}</strong> has been added to your GoCart wallet and will appear on your next order.</p>
     `),
   })
 }
@@ -255,7 +255,7 @@ export async function sendAdminApplicationEmail({
     subject: `New ${kindLabel} application — ${applicantName}`,
     html: html(`
       <h2>New ${kindLabel.toLowerCase()} application</h2>
-      <p><strong>${applicantName}</strong> has applied to ${kind === 'vendor' ? 'sell on' : 'ride with'} Dart.</p>
+      <p><strong>${applicantName}</strong> has applied to ${kind === 'vendor' ? 'sell on' : 'ride with'} GoCart.</p>
       <table style="border-collapse:collapse;margin:12px 0">${dataRows}</table>
       ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/admin/applications`, 'Review application')}
     `),
@@ -272,9 +272,9 @@ export async function sendVendorApprovedEmail({
   await resend.emails.send({
     from: FROM,
     to,
-    subject: 'Your Dart vendor application was approved!',
+    subject: 'Your GoCart vendor application was approved!',
     html: html(`
-      <h2 style="color:#0B7A47">You're on Dart!</h2>
+      <h2 style="color:#0B7A47">You're on GoCart!</h2>
       <p>Hi ${name}, your vendor application has been approved.</p>
       <p>Sign in to your account, open the Vendor dashboard, and complete your shop setup. Your menu goes live once you've added photos and prices for at least 3 items.</p>
       ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/vendor`, 'Go to vendor dashboard')}
@@ -292,9 +292,9 @@ export async function sendRiderApprovedEmail({
   await resend.emails.send({
     from: FROM,
     to,
-    subject: 'Your Dart rider application was approved!',
+    subject: 'Your GoCart rider application was approved!',
     html: html(`
-      <h2 style="color:#0B7A47">Welcome to the Dart team!</h2>
+      <h2 style="color:#0B7A47">Welcome to the GoCart team!</h2>
       <p>Hi ${name}, your rider application has been approved.</p>
       <p>Sign in to your account and open the Rider dashboard to start accepting jobs.</p>
       ${btn(`${process.env.NEXT_PUBLIC_APP_URL}/rider`, 'Go to rider dashboard')}

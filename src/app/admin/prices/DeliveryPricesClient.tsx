@@ -205,7 +205,7 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
         <h1 className="font-heading font-bold text-[26px] leading-tight">Delivery prices</h1>
         <p className="text-[14px] text-ink-2 mt-1 max-w-xl">
           Pick the area a vendor is in. Each row shows what a delivery from there to another area costs
-          the customer, what the rider earns, and what Dart keeps. Prices are the same in both directions.
+          the customer, what the rider earns, and what GoCart keeps. Prices are the same in both directions.
         </p>
       </div>
 
@@ -254,7 +254,7 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
                       <th className="text-right pb-2.5 px-3 font-semibold text-[11px] text-ink-2 uppercase tracking-wide whitespace-nowrap">Okada</th>
                       <th className="text-right pb-2.5 px-3 font-semibold text-[11px] text-ink-2 uppercase tracking-wide whitespace-nowrap">Rider gets</th>
                       <th className="text-right pb-2.5 px-3 font-semibold text-[11px] text-ink-2 uppercase tracking-wide whitespace-nowrap">Customer pays</th>
-                      <th className="text-right pb-2.5 pl-3 font-semibold text-[11px] text-brand uppercase tracking-wide whitespace-nowrap">Dart keeps</th>
+                      <th className="text-right pb-2.5 pl-3 font-semibold text-[11px] text-brand uppercase tracking-wide whitespace-nowrap">GoCart keeps</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,7 +438,7 @@ export function DeliveryPricesClient({ initialAreas, initialZoneFares, initialFa
                     <span className="font-bold text-ink">{formatMoney(vendorGets)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[13px] border-t border-brand/20 pt-1.5 mt-0.5">
-                    <span className="text-ink-2 font-semibold">Dart keeps</span>
+                    <span className="text-ink-2 font-semibold">GoCart keeps</span>
                     <span className="font-bold text-brand">{formatMoney(dartKeeps)}</span>
                   </div>
                 </div>

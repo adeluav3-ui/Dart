@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // Mark payment as refunded
     await admin.from('payments').update({ status: 'refunded' }).eq('id', payment.id)
 
-    // Credit wallet (refund goes to internal Dart wallet, not reversed through Monnify)
+    // Credit wallet (refund goes to internal GoCart wallet, not reversed through Monnify)
     await admin.from('wallet_transactions').insert({
       user_id: payment.user_id ?? null,
       order_id: orderId,

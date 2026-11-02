@@ -19,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-canvas font-body text-ink flex flex-col">
       <header className="bg-ink text-white px-5 py-3 flex items-center justify-between">
-        <span className="font-heading font-extrabold text-xl">Dart Admin</span>
+        <span className="font-heading font-extrabold text-xl">GoCart Admin</span>
         <AdminSignOut />
       </header>
 

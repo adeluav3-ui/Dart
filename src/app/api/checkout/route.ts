@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
     })
 
     // 11. Init Monnify payment
-    const reference = `DT-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
+    const reference = `GC-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
 
     await admin.from('payments').insert({
       order_id: order.id,
@@ -295,8 +295,8 @@ async function initMonnifyTransaction({
     body: JSON.stringify({
       amount,
       customerName: 'Customer',
-      customerEmail: `${customerPhone.replace(/\D/g, '')}@dart.app`,
-      paymentDescription: `Dart Order ${orderCode}`,
+      customerEmail: `${customerPhone.replace(/\D/g, '')}@gocart.app`,
+      paymentDescription: `GoCart Order ${orderCode}`,
       paymentReference: reference,
       currencyCode: 'NGN',
       contractCode,

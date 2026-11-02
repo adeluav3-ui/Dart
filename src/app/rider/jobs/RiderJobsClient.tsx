@@ -188,7 +188,7 @@ export function RiderJobsClient({
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
       >
         <div>
-          <p className="text-[11px] text-white/50 font-medium tracking-wide uppercase mb-0.5">Dart rider</p>
+          <p className="text-[11px] text-white/50 font-medium tracking-wide uppercase mb-0.5">GoCart rider</p>
           <p className="font-heading font-extrabold text-[22px] text-white leading-tight">Hi, {firstName}</p>
         </div>
         <div className="text-right">
@@ -242,7 +242,7 @@ export function RiderJobsClient({
                 {nearestArea && <p className="text-[14px] font-bold text-ink">Near {nearestArea}</p>}
                 <p className="text-[12px] text-ink-2">
                   Location updated {locUpdatedAt ? formatLocationAge(locUpdatedAt) : 'never'}
-                  {' · '}keeps updating while Dart is open
+                  {' · '}keeps updating while GoCart is open
                 </p>
                 {isStale && (
                   <p className="text-[12px] text-danger font-semibold mt-0.5">Location is stale — tap Refresh</p>
@@ -264,7 +264,7 @@ export function RiderJobsClient({
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               <p className="text-[13px] text-warn leading-relaxed">
-                Vendors will <strong>call you</strong> before giving you a job. Keep your phone on and loud. If Dart stays closed for 30 minutes, you&apos;ll go offline automatically.
+                Vendors will <strong>call you</strong> before giving you a job. Keep your phone on and loud. If GoCart stays closed for 30 minutes, you&apos;ll go offline automatically.
               </p>
             </div>
           </>
@@ -273,7 +273,7 @@ export function RiderJobsClient({
         {/* When not available: how it works */}
         {!available && (
           <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
-            <p className="text-[13px] font-bold text-ink-2 uppercase tracking-wide">How Dart jobs work</p>
+            <p className="text-[13px] font-bold text-ink-2 uppercase tracking-wide">How GoCart jobs work</p>
             {[
               { n: '1', text: 'A vendor calls you to offer a job' },
               { n: '2', text: 'They assign the order to you on their board' },

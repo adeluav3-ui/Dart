@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { DartLogo } from '@/components/ui/DartLogo'
+import { Logo } from '@/components/ui/Logo'
 
 const SLIDES = [
   {
@@ -39,18 +39,12 @@ const SLIDES = [
   },
   {
     title: 'Delivered to your landmark',
-    body: 'No street name needed. Tell us the landmark and your Dart rider finds you.',
+    body: 'No street name needed. Tell us the landmark and your GoCart rider finds you.',
     Illustration: () => (
       <div className="w-full max-w-[260px] mx-auto aspect-square rounded-3xl bg-brand-tint flex flex-col items-center justify-center gap-4">
-        {/* Bullseye target */}
         <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-sm">
-          <svg width="56" height="56" viewBox="0 0 120 120">
-            <circle cx="50" cy="74" r="32" fill="none" stroke="#0B7A47" strokeWidth="14" />
-            <circle cx="50" cy="74" r="10" fill="#F26A1B" />
-            <polygon points="82,24 96,12 96,113 82,113" fill="#0B7A47" />
-          </svg>
+          <Logo variant="symbol" height={48} />
         </div>
-        {/* Landmark label */}
         <div className="bg-white rounded-2xl px-4 py-2 shadow-sm">
           <span className="text-[13px] font-semibold text-ink">Opposite OOUTH main gate</span>
         </div>
@@ -91,9 +85,8 @@ export default function WelcomePage() {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <DartLogo />
+        <Logo height={28} />
         <button
           type="button"
           className="text-sm font-semibold text-ink-2 min-h-[44px] flex items-center"
@@ -103,7 +96,6 @@ export default function WelcomePage() {
         </button>
       </div>
 
-      {/* Slide content */}
       <div className="flex-1 flex flex-col px-6 pt-6 pb-4 select-none">
         <div className="flex-1 flex flex-col justify-center gap-6">
           <Illustration />
@@ -116,7 +108,6 @@ export default function WelcomePage() {
           </div>
         </div>
 
-        {/* Dot indicators */}
         <div className="flex items-center justify-center gap-2 py-6">
           {SLIDES.map((_, i) => (
             <button
@@ -133,7 +124,6 @@ export default function WelcomePage() {
           ))}
         </div>
 
-        {/* CTA */}
         <div className="flex flex-col gap-3">
           <button
             type="button"

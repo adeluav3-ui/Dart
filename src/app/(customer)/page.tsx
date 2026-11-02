@@ -42,7 +42,6 @@ export default function SplashPage() {
       router.replace('/home')
     }
 
-    // Skip animation if already seen this session or reduced motion
     if (alreadySeen || prefersReduced) {
       go()
       return
@@ -50,9 +49,9 @@ export default function SplashPage() {
 
     sessionStorage.setItem('dart_splash_seen', '1')
 
-    const nav = setTimeout(go, 1000)
-    const fadeOut = setTimeout(() => setPhase('out'), 1200)
-    return () => { clearTimeout(fadeOut); clearTimeout(nav) }
+    const nav = setTimeout(go, 1500)
+    const fadeOut = setTimeout(() => setPhase('out'), 1700)
+    return () => { clearTimeout(nav); clearTimeout(fadeOut) }
   }, [router])
 
   return (
@@ -61,27 +60,40 @@ export default function SplashPage() {
         phase === 'out' ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      {/* Logo + wordmark */}
-      <div className="flex items-center gap-3 animate-splash-logo">
-        <svg width="52" height="52" viewBox="0 0 120 120" aria-hidden="true">
-          <circle cx="50" cy="74" r="32" fill="none" stroke="white" strokeWidth="14" />
-          <circle cx="50" cy="74" r="10" fill="#F26A1B" className="animate-splash-dot" />
-          <polygon points="82,24 96,12 96,113 82,113" fill="white" />
-        </svg>
-        <span
-          className="font-heading font-extrabold text-[52px] leading-none tracking-tight text-white animate-splash-text"
-          style={{ marginTop: -6 }}
+      <div className="flex flex-col items-center gap-5">
+        {/* Inline symbol — basket slides in, wheels pop after */}
+        <svg
+          width="96"
+          height="84"
+          viewBox="0 0 120 104"
+          aria-hidden="true"
+          className="overflow-visible"
         >
-          dart
+          <g className="animate-basket-slide">
+            <path d="M8 16 H22 L28 30" fill="none" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 46 H16 M6 58 H18 M10 70 H22" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" opacity="0.45" />
+            <polygon points="28,30 112,30 99,76 40,76" fill="white" />
+            <path d="M62 41 L76 53 L62 65" fill="none" stroke="#0B7A47" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+          <circle cx="50" cy="92" r="9" fill="#F26A1B" className="animate-wheel-pop" style={{ animationDelay: '0.5s' }} />
+          <circle cx="90" cy="92" r="9" fill="#F26A1B" className="animate-wheel-pop" style={{ animationDelay: '0.62s' }} />
+        </svg>
+
+        {/* Wordmark fades up after wheels */}
+        <span
+          className="font-heading font-extrabold text-[40px] leading-none tracking-tight text-white animate-splash-text"
+          style={{ animationDelay: '0.85s' }}
+          aria-label="GoCart"
+        >
+          gocart
         </span>
       </div>
 
-      {/* Tagline */}
       <p
         className="absolute text-white/70 text-[15px] font-body tracking-wide animate-splash-text"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 48px)', animationDelay: '1.1s' }}
       >
-        Anything nearby, delivered
+        Fill your cart. We&apos;ll go get it.
       </p>
     </div>
   )

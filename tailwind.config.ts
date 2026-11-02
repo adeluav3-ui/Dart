@@ -13,6 +13,7 @@ const config: Config = {
         'brand-dark': '#086138',
         'brand-ink': '#0A4F30',
         'brand-tint': '#E7F4EC',
+        'brand-bright': '#3DDC84',
         pepper: '#F26A1B',
         ink: '#15171A',
         'ink-2': '#5B6168',
@@ -38,19 +39,19 @@ const config: Config = {
         'btn-sm': '44px',
       },
       keyframes: {
-        'splash-logo': {
-          '0%': { transform: 'scale(0.6)', opacity: '0' },
-          '70%': { transform: 'scale(1.06)', opacity: '1' },
+        'basket-slide': {
+          '0%': { transform: 'translateX(-40px)', opacity: '0' },
+          '60%': { opacity: '1' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        'wheel-pop': {
+          '0%': { transform: 'scale(0)', opacity: '0' },
+          '70%': { transform: 'scale(1.3)', opacity: '1' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
         'splash-text': {
-          '0%, 30%': { opacity: '0', transform: 'translateY(6px)' },
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        'splash-dot': {
-          '0%, 50%': { transform: 'scale(0)', opacity: '0' },
-          '80%': { transform: 'scale(1.4)', opacity: '1' },
-          '100%': { transform: 'scale(1)', opacity: '1' },
         },
         'status-in': {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
@@ -67,9 +68,9 @@ const config: Config = {
         },
       },
       animation: {
-        'splash-logo': 'splash-logo 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-        'splash-text': 'splash-text 0.6s ease-out 0.55s both',
-        'splash-dot': 'splash-dot 0.5s ease-out 0.65s both',
+        'basket-slide': 'basket-slide 0.55s ease-out forwards',
+        'wheel-pop': 'wheel-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both',
+        'splash-text': 'splash-text 0.45s ease-out both',
         'status-in': 'status-in 0.4s ease-out',
         'check-pop': 'check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
         'flash-fade': 'flash-fade 0.8s ease-out forwards',

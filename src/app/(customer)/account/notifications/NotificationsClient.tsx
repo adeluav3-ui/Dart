@@ -50,7 +50,7 @@ export function NotificationsClient({ userId, marketingEmails: initial }: Props)
           <div className="flex items-center gap-3 px-4 py-4">
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-semibold text-ink">Promotions &amp; offers</p>
-              <p className="text-[12px] text-ink-2 mt-0.5">Deals, new vendors and Dart news</p>
+              <p className="text-[12px] text-ink-2 mt-0.5">Deals, new vendors and GoCart news</p>
             </div>
             <button
               type="button"

@@ -1,12 +1,12 @@
-# Dart
+# GoCart
 
-Dart is a local delivery app for Sagamu, Ogun State, Nigeria: customers order from restaurants, supermarkets and pharmacies, pay online, and a rider brings it to their landmark. This repo is the MVP. Its only job is to prove that orders repeat at a positive margin. Ship the simplest thing that does that.
+GoCart is a local delivery app for Sagamu, Ogun State, Nigeria: customers order from restaurants, supermarkets and pharmacies, pay online, and a rider brings it to their landmark. This repo is the MVP. Its only job is to prove that orders repeat at a positive margin. Ship the simplest thing that does that.
 
 ## Read first
 
 - `docs/build-spec.md` — the full spec: data model, order state machine, money flow, screens, build order. **The spec wins** over anything else in this repo.
 - `docs/design/*.dc.html` — the approved screen designs, as HTML markup with inline styles. Read them for layout, spacing, colours and copy. They use a custom runtime (`support.js`, `<x-dc>`, `{{holes}}`), so do not run them or copy that runtime — rebuild each screen as React + Tailwind.
-- `public/logo.svg`, `public/icon.svg` — the logo and app icon.
+- `public/brand/gocart-logo.svg`, `public/brand/gocart-symbol.svg` — the logo and symbol. Use the `<Logo>` component at `src/components/ui/Logo.tsx` for all logo usage.
 
 | Design file | Screen |
 | --- | --- |
@@ -39,7 +39,8 @@ Put these in `tailwind.config` and use the names, never raw hex in components.
 | `brand-dark` | `#086138` | Hover / pressed |
 | `brand-ink` | `#0A4F30` | Text on brand-tint |
 | `brand-tint` | `#E7F4EC` | Trust banner, secondary buttons |
-| `pepper` | `#F26A1B` | Logo bullseye and rare highlights only — not for buttons |
+| `brand-bright` | `#3DDC84` | On dark backgrounds only |
+| `pepper` | `#F26A1B` | Wheel accents in logo only — not for buttons |
 | `ink` | `#15171A` | Primary text, dark headers |
 | `ink-2` | `#5B6168` | Secondary text |
 | `line` | `#E6E8EB` | Borders, dividers |
@@ -54,7 +55,7 @@ Fonts (Google Fonts): **Bricolage Grotesque** 700/800 for headings and the wordm
 
 Shape: cards and buttons `rounded-2xl` (16px), chips fully rounded, primary buttons 56px tall, every touch target at least 44px. Icons are 2px-stroke outline icons (lucide-react fits); no emoji.
 
-Wordmark: lowercase `dart` in Bricolage Grotesque 800 with tight tracking, next to the symbol. Never recolour the bullseye.
+Logo: use the `<Logo>` component. variant `full` on white/light, `white` on brand green, `dark` on ink #15171A, `symbol`/`symbol-white` where space is tight. Never recolour or stretch.
 
 ## Rules that must not be broken
 
@@ -75,6 +76,8 @@ Wordmark: lowercase `dart` in Bricolage Grotesque 800 with tight tracking, next 
 - Phone numbers are Nigerian (`+234`); accept `080…` input and normalise.
 - Images: WebP, ~100 KB, lazy loaded. Assume a slow 3G connection.
 - Ratings are hidden until a vendor has 5 reviews; show a "New" badge instead.
+- Order codes use `GC-` prefix (e.g. `GC-1000`). Existing orders with `SD-` codes are still valid — lookups match the stored value exactly.
+- Payment references use `GC-{orderId8}-{timestamp36}` format.
 
 ## Out of scope for v1
 

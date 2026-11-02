@@ -30,7 +30,7 @@ export default async function WalletPage() {
             </svg>
           </div>
           <div className="text-center flex flex-col gap-1.5">
-            <p className="font-heading font-bold text-[18px] text-ink">Sign in to see your Dart credit</p>
+            <p className="font-heading font-bold text-[18px] text-ink">Sign in to see your GoCart credit</p>
             <p className="text-[14px] text-ink-2">Refunds go here and are used automatically at checkout.</p>
           </div>
           <Link

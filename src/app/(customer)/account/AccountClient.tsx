@@ -143,7 +143,7 @@ export function AccountClient({ profile, email, applications, userId, version }:
             {!isVendor && (
               <ApplicationRow
                 icon={<Store size={18} />}
-                title="Sell on Dart"
+                title="Sell on GoCart"
                 subtitle="List your kitchen, shop or pharmacy"
                 kind="vendor"
                 app={vendorApp ?? null}
@@ -152,7 +152,7 @@ export function AccountClient({ profile, email, applications, userId, version }:
             {!isRider && (
               <ApplicationRow
                 icon={<Bike size={18} />}
-                title="Ride with Dart"
+                title="Ride with GoCart"
                 subtitle="Earn delivering in Sagamu"
                 kind="rider"
                 app={riderApp ?? null}

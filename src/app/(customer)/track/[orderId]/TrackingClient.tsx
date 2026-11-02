@@ -391,7 +391,7 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
           )}
           {feeInfoOpen && (
             <p className="text-[11px] text-ink-2 bg-white rounded-lg px-2.5 py-1.5 leading-relaxed">
-              Helps us run Dart: payments, support and refunds.
+              Helps us run GoCart: payments, support and refunds.
             </p>
           )}
           <div className="flex justify-between font-bold text-sm pt-1 border-t border-line">
