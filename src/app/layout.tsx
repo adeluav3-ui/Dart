@@ -1,5 +1,20 @@
 import type { Metadata, Viewport } from 'next'
+import { Bricolage_Grotesque, Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
+
+const heading = Bricolage_Grotesque({
+  subsets: ['latin'],
+  weight: ['700', '800'],
+  variable: '--font-heading',
+  display: 'swap',
+})
+
+const body = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-body',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: {
@@ -40,7 +55,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en-NG" className={`${heading.variable} ${body.variable}`}>
       <body>
         <SplashScreen />
         <NavigationProgress />

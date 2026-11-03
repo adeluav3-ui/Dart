@@ -2,7 +2,7 @@
   "name": "GoCart",
   "short_name": "GoCart",
   "description": "Food, groceries and pharmacy, delivered in Sagamu",
-  "start_url": "/",
+  "start_url": "/start",
   "display": "standalone",
   "background_color": "#0B7A47",
   "theme_color": "#0B7A47",

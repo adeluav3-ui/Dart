@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function RootPage() {
+export default function StartPage() {
   const router = useRouter()
   const navigated = useRef(false)
 
@@ -41,6 +41,5 @@ export default function RootPage() {
     go()
   }, [router])
 
-  // SplashScreen in root layout covers this blank state
   return null
 }

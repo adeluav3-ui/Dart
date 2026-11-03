@@ -8,6 +8,7 @@ export function SplashScreen() {
   const [fading, setFading] = useState(false)
 
   useEffect(() => {
+    if (window.location.pathname === '/') return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     if (sessionStorage.getItem('gc_splash_seen')) return
     sessionStorage.setItem('gc_splash_seen', '1')

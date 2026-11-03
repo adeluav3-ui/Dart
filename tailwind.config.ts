@@ -27,8 +27,8 @@ const config: Config = {
         star: '#F5A524',
       },
       fontFamily: {
-        heading: ['Bricolage Grotesque', 'system-ui', 'sans-serif'],
-        body: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-heading)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         '2xl': '16px',

@@ -1,5 +1,7 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 
+export const metadata: Metadata = { robots: { index: false } }
 export const dynamic = 'force-dynamic'
 import { HomeClient } from '../HomeClient'
 import type { Vendor, Zone, Area, ZoneFare, FareLevel } from '@/types/database'
