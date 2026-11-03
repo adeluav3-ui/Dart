@@ -9,19 +9,18 @@ export function SplashScreen() {
   const [fading, setFading] = useState(false)
 
   useEffect(() => {
-    // Never show on the landing page itself
-    if (pathname === '/') return
+    // Landing page and /start (which has its own embedded splash) are excluded
+    if (pathname === '/' || pathname === '/start') return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    // Only show once per session
     if (sessionStorage.getItem('gc_splash_seen')) return
     sessionStorage.setItem('gc_splash_seen', '1')
 
-    setFading(false)
     setShow(true)
     const fade = setTimeout(() => setFading(true), 1400)
     const hide = setTimeout(() => setShow(false), 1750)
     return () => { clearTimeout(fade); clearTimeout(hide) }
-  }, [pathname])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // only on mount — for users who open the app directly (bookmark, PWA icon, etc.)
 
   if (!show) return null
 
