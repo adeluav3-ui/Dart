@@ -55,7 +55,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en-NG" className={`${heading.variable} ${body.variable}`}>
+    <html lang="en-NG" className={`${heading.variable} ${body.variable}`} style={{ backgroundColor: '#F6F7F5' }}>
       <body>
         <SplashScreen />
         <NavigationProgress />

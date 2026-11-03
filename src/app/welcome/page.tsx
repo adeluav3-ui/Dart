@@ -80,7 +80,7 @@ export default function WelcomePage() {
 
   return (
     <div
-      className="min-h-dvh bg-white flex flex-col"
+      className="min-h-dvh bg-canvas flex flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}

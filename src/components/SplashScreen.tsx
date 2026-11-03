@@ -1,23 +1,27 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 export function SplashScreen() {
-  // Start hidden to avoid SSR mismatch; show only after mount check
+  const pathname = usePathname()
   const [show, setShow] = useState(false)
   const [fading, setFading] = useState(false)
 
   useEffect(() => {
-    if (window.location.pathname === '/') return
+    // Never show on the landing page itself
+    if (pathname === '/') return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    // Only show once per session
     if (sessionStorage.getItem('gc_splash_seen')) return
     sessionStorage.setItem('gc_splash_seen', '1')
 
+    setFading(false)
     setShow(true)
     const fade = setTimeout(() => setFading(true), 1400)
     const hide = setTimeout(() => setShow(false), 1750)
     return () => { clearTimeout(fade); clearTimeout(hide) }
-  }, [])
+  }, [pathname])
 
   if (!show) return null
 

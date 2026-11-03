@@ -1,36 +1,76 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { X, Menu } from 'lucide-react'
+
+const NAV_LINKS = [
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#categories', label: 'Shops' },
+  { href: '#areas', label: 'Areas' },
+  { href: '#faq', label: 'FAQ' },
+  { href: '/sell', label: 'Sell on GoCart' },
+]
 
 function LandingNav() {
+  const [open, setOpen] = useState(false)
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-line">
       <nav className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="shrink-0">
-          <Image
-            src="/brand/gocart-logo.svg"
-            alt="GoCart"
-            width={100}
-            height={28}
-            priority
-          />
+        <Link href="/" className="shrink-0" onClick={() => setOpen(false)}>
+          <Image src="/brand/gocart-logo.svg" alt="GoCart" width={100} height={28} priority />
         </Link>
 
         {/* Desktop nav */}
         <ul className="hidden md:flex items-center gap-6 text-sm font-semibold text-ink-2">
-          <li><a href="#how-it-works" className="hover:text-ink transition-colors">How it works</a></li>
-          <li><a href="#categories" className="hover:text-ink transition-colors">Shops</a></li>
-          <li><a href="#areas" className="hover:text-ink transition-colors">Areas</a></li>
-          <li><a href="#faq" className="hover:text-ink transition-colors">FAQ</a></li>
-          <li><Link href="/sell" className="hover:text-ink transition-colors">Sell on GoCart</Link></li>
+          {NAV_LINKS.map(l => (
+            <li key={l.href}>
+              <a href={l.href} className="hover:text-ink transition-colors">{l.label}</a>
+            </li>
+          ))}
         </ul>
 
-        <Link
-          href="/start"
-          className="shrink-0 h-10 px-5 rounded-2xl bg-brand text-white text-sm font-bold flex items-center hover:bg-brand-dark transition-colors"
-        >
-          Order now
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/start"
+            className="h-10 px-5 rounded-2xl bg-brand text-white text-sm font-bold flex items-center hover:bg-brand-dark transition-colors"
+          >
+            Order now
+          </Link>
+
+          {/* Hamburger button — mobile only */}
+          <button
+            type="button"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-ink hover:bg-surface transition-colors"
+            onClick={() => setOpen(v => !v)}
+          >
+            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </nav>
+
+      {/* Mobile drawer */}
+      {open && (
+        <div className="md:hidden border-t border-line bg-white">
+          <ul className="px-4 py-3 flex flex-col">
+            {NAV_LINKS.map(l => (
+              <li key={l.href}>
+                <a
+                  href={l.href}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center h-12 text-base font-semibold text-ink hover:text-brand transition-colors"
+                >
+                  {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </header>
   )
 }

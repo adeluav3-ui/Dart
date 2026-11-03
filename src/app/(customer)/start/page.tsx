@@ -41,5 +41,6 @@ export default function StartPage() {
     go()
   }, [router])
 
-  return null
+  // bg-canvas prevents a white flash while the async redirect runs
+  return <div className="fixed inset-0 bg-canvas" />
 }
