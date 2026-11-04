@@ -59,6 +59,8 @@ export interface Vendor {
   payout_account_name: string | null
   payout_account_no: string | null
   created_at: string
+  lat: number | null
+  lng: number | null
 }
 
 export interface VendorHours {
@@ -147,8 +149,22 @@ export interface Area {
   pin_saved_by: string | null
   gate_pickup: boolean
   status: AreaStatus
+  is_active: boolean
   sort_order: number
   created_at: string
+}
+
+export interface DeliveryPricingSettings {
+  id: number
+  base_fare_kobo: number
+  per_km_kobo: number
+  min_fare_kobo: number
+  round_to_kobo: number
+  rider_extra_kobo: number
+  gocart_extra_kobo: number
+  max_distance_m: number
+  daily_google_call_cap: number
+  updated_at: string
 }
 
 export interface AreaPinHistory {
@@ -288,6 +304,14 @@ export interface Order {
   pickup_lng: number | null
   pickup_distance_m: number | null
   rider_assigned_at: string | null
+  pin_lat: number | null
+  pin_lng: number | null
+  distance_m: number | null
+  distance_source: string | null
+  okada_fare_kobo: number | null
+  rider_pay_kobo: number | null
+  delivery_fee_kobo: number | null
+  pricing_snapshot: Record<string, unknown> | null
 }
 
 export interface OrderItem {

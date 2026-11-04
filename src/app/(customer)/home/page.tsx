@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { HomeClient } from '../HomeClient'
+import type { Vendor, Zone, Area, DeliveryPricingSettings } from '@/types/database'
 
 export const metadata: Metadata = { robots: { index: false } }
 export const dynamic = 'force-dynamic'
-import { HomeClient } from '../HomeClient'
-import type { Vendor, Zone, Area, ZoneFare, FareLevel } from '@/types/database'
 
 export default async function HomePage() {
   const supabase = createClient()
@@ -14,8 +14,7 @@ export default async function HomePage() {
     { data: rawVendors },
     { data: zones },
     { data: areas },
-    { data: zoneFares },
-    { data: fareLevels },
+    { data: pricingSettings },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -25,12 +24,10 @@ export default async function HomePage() {
       .order('is_open', { ascending: false })
       .order('rating_avg', { ascending: false }),
     supabase.from('zones').select('*').eq('is_active', true).order('name'),
-    supabase.from('areas').select('*').order('status').order('sort_order'),
-    supabase.from('zone_fares').select('*'),
-    supabase.from('fare_levels').select('*').order('sort_order'),
+    supabase.from('areas').select('*').eq('is_active', true).order('status').order('sort_order'),
+    supabase.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
   ])
 
-  // Flatten menu_categories into a string array for each vendor
   const vendors: (Vendor & { menuCategoryNames: string[] })[] = (rawVendors ?? []).map((v: any) => {
     const { menu_categories, ...rest } = v
     return {
@@ -45,8 +42,7 @@ export default async function HomePage() {
       vendors={vendors}
       zones={(zones as Zone[]) ?? []}
       areas={(areas as Area[]) ?? []}
-      zoneFares={(zoneFares as ZoneFare[]) ?? []}
-      fareLevels={(fareLevels as FareLevel[]) ?? []}
+      pricingSettings={(pricingSettings as DeliveryPricingSettings) ?? null}
     />
   )
 }

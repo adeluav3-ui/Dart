@@ -1,17 +1,20 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { X, Search, Navigation } from 'lucide-react'
+import { useState, useRef, lazy, Suspense } from 'react'
+import { X, Search, Navigation, Map } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { areaDisplayName } from '@/lib/format'
 import type { Area, Zone } from '@/types/database'
 
+// Lazy-load MapPicker to avoid pulling Leaflet into the initial bundle
+const MapPicker = lazy(() => import('./MapPicker').then(m => ({ default: m.MapPicker })))
+
 interface Props {
   areas: Area[]
   zones: Zone[]
   selectedId: string
-  onSave: (areaId: string, areaName: string) => void
+  onSave: (areaId: string | null, areaName: string, lat: number, lng: number) => void
   onClose?: () => void
 }
 
@@ -55,14 +58,18 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistSent, setWaitlistSent] = useState(false)
   const [waitlistSaving, setWaitlistSaving] = useState(false)
+  const [showMap, setShowMap] = useState(false)
   const waitlistRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+
+  // Only show areas that are active and have coordinates
+  const activeAreas = areas.filter(a => a.is_active !== false)
 
   const normalizedSearch = normalizeText(search)
   const zoneMap = Object.fromEntries(zones.map(z => [z.id, z]))
   const isSearching = !!normalizedSearch
 
-  const filtered = areas.filter(a => {
+  const filtered = activeAreas.filter(a => {
     if (!normalizedSearch) return true
     return (
       normalizeText(a.name).includes(normalizedSearch) ||
@@ -71,7 +78,6 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
     )
   })
 
-  // Build zone → district → areas hierarchy
   type DistrictGroup = { district: string | null; areas: Area[] }
   type ZoneGroup = { zoneId: string | null; zoneName: string; districtGroups: DistrictGroup[] }
 
@@ -100,6 +106,16 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
     }
   }
 
+  // Also include coming-soon areas in a separate section
+  const comingSoonAreas = areas.filter(a => a.status === 'coming_soon')
+  if (comingSoonAreas.length > 0 && !normalizedSearch) {
+    zoneGroups.push({
+      zoneId: '__coming_soon',
+      zoneName: 'Coming Soon',
+      districtGroups: [{ district: null, areas: comingSoonAreas }],
+    })
+  }
+
   function detectLocation() {
     if (!navigator.geolocation) { setLocError('Location not supported on this device'); return }
     setLocating(true)
@@ -109,7 +125,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
         const { latitude: lat, longitude: lng } = pos.coords
         let nearest: Area | null = null
         let nearestDist = Infinity
-        for (const a of areas) {
+        for (const a of activeAreas) {
           if (a.lat == null || a.lng == null) continue
           const dist = haversineKm(lat, lng, a.lat, a.lng)
           if (dist < nearestDist) { nearestDist = dist; nearest = a }
@@ -167,9 +183,8 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   }
 
   function handleContinue() {
-    const area = areas.find(a => a.id === selected && a.status === 'active')
-    if (!area) return
-    // Log GPS detection result (fire-and-forget, best effort)
+    const area = activeAreas.find(a => a.id === selected && a.status === 'active')
+    if (!area || area.lat == null || area.lng == null) return
     if (gpsSuggestedId) {
       supabase.from('location_detection_log').insert({
         area_id_suggested: gpsSuggestedId,
@@ -177,10 +192,32 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
       }).then(() => {})
       setGpsSuggestedId(null)
     }
-    onSave(selected, areaDisplayName(area))
+    onSave(area.id, areaDisplayName(area), area.lat, area.lng)
   }
 
-  const canContinue = !!areas.find(a => a.id === selected && a.status === 'active')
+  function handleMapConfirm(lat: number, lng: number) {
+    onSave(null, 'Custom location', lat, lng)
+  }
+
+  const selectedArea = activeAreas.find(a => a.id === selected && a.status === 'active')
+  const canContinue = !!selectedArea && selectedArea.lat != null && selectedArea.lng != null
+
+  if (showMap) {
+    const currentPin = selectedArea
+      ? { lat: selectedArea.lat!, lng: selectedArea.lng! }
+      : undefined
+
+    return (
+      <Suspense fallback={null}>
+        <MapPicker
+          initialLat={currentPin?.lat}
+          initialLng={currentPin?.lng}
+          onConfirm={handleMapConfirm}
+          onClose={() => setShowMap(false)}
+        />
+      </Suspense>
+    )
+  }
 
   return (
     <>
@@ -201,23 +238,33 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
           )}
         </div>
 
-        {/* Detect location */}
-        <div className="px-4 pb-3 shrink-0">
+        {/* Action row */}
+        <div className="px-4 pb-3 shrink-0 flex gap-2">
           <button
             type="button"
             onClick={detectLocation}
             disabled={locating}
-            className="flex items-center gap-2.5 w-full h-11 px-4 rounded-2xl border border-brand bg-brand-tint text-brand font-semibold text-[14px] disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-2xl border border-brand bg-brand-tint text-brand font-semibold text-[14px] disabled:opacity-60"
           >
             {locating ? (
               <span className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
             ) : (
               <Navigation size={16} />
             )}
-            {locating ? 'Detecting…' : 'Use my current location'}
+            {locating ? 'Detecting…' : 'Use location'}
           </button>
-          {locError && <p className="text-xs text-danger mt-1.5 px-1">{locError}</p>}
+
+          <button
+            type="button"
+            onClick={() => setShowMap(true)}
+            className="flex items-center justify-center gap-2 h-11 px-4 rounded-2xl border border-line bg-surface text-ink font-semibold text-[14px]"
+          >
+            <Map size={16} />
+            Pick on map
+          </button>
         </div>
+
+        {locError && <p className="text-xs text-danger mx-4 mb-2 px-1">{locError}</p>}
 
         {/* Search */}
         <div className="px-4 pb-3 shrink-0">
@@ -241,14 +288,12 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
 
           {zoneGroups.map(zoneGroup => (
             <div key={zoneGroup.zoneId ?? '__coming_soon'} className="mb-3">
-              {/* Zone header */}
               <p className="text-[11px] font-bold text-ink-2 uppercase tracking-wide px-1 mb-1">
                 {zoneGroup.zoneName}
               </p>
 
               {zoneGroup.districtGroups.map(dg => (
                 <div key={dg.district ?? '__no_district'}>
-                  {/* District sub-header (only when not searching — searching shows display name inline) */}
                   {dg.district && !isSearching && (
                     <p className="text-[12px] font-semibold text-ink-2 px-2 pt-1 pb-0.5">
                       {dg.district}
@@ -258,7 +303,6 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
                   {dg.areas.map(area => {
                     const isComing = area.status === 'coming_soon'
                     const isSelected = area.id === selected
-                    // When searching, show full "Area, District"; when browsing under heading, just name
                     const label = (isSearching && area.district)
                       ? areaDisplayName(area)
                       : area.name
@@ -309,12 +353,11 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
             </div>
           ))}
 
-          {/* Hint text */}
           <p className="text-[13px] text-ink-2 text-center px-2 py-3">
             Not sure? Pick the place closest to you — your rider will call if needed.
           </p>
 
-          {/* Waitlist section */}
+          {/* Waitlist */}
           <div ref={waitlistRef} className="mb-4 mt-1">
             {waitlistArea === null ? (
               <button

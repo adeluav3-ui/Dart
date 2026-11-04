@@ -9,9 +9,17 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
 import { AreaPicker } from '@/components/AreaPicker'
 import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartItemCount, cartSubtotal } from '@/store/cart'
-import type { Vendor, Zone, Area, ZoneFare, FareLevel, VendorType } from '@/types/database'
+import { estimateDeliveryDistance, calcDeliveryPrice } from '@/lib/pricing/delivery'
+import type { Vendor, Zone, Area, VendorType, DeliveryPricingSettings } from '@/types/database'
 
-const areaKey = (userId: string | null) => `dart_area_${userId ?? 'guest'}`
+interface DeliveryPin {
+  areaId: string | null
+  areaName: string
+  lat: number
+  lng: number
+}
+
+const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
 
 const STORE_TYPES: { label: string; value: VendorType | 'all' }[] = [
   { label: 'Food', value: 'restaurant' },
@@ -26,45 +34,62 @@ interface Props {
   vendors: (Vendor & { menuCategoryNames: string[] })[]
   zones: Zone[]
   areas: Area[]
-  zoneFares: ZoneFare[]
-  fareLevels: FareLevel[]
+  pricingSettings: DeliveryPricingSettings | null
 }
 
-export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevels }: Props) {
+export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: Props) {
   const [storeType, setStoreType] = useState<VendorType | 'all'>('restaurant')
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
-  const [areaId, setAreaId] = useState('')
+  const [pin, setPin] = useState<DeliveryPin | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const { cart } = useCart()
   const itemCount = cart ? cartItemCount(cart) : 0
 
-  // Hydrate area from localStorage; open picker if none selected
+  // Hydrate pin from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(areaKey(userId))
-    if (saved && areas.some(a => a.id === saved && a.status === 'active')) {
-      setAreaId(saved)
-    } else if (areas.length > 0) {
+    const raw = localStorage.getItem(deliveryKey(userId))
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as DeliveryPin
+        // Validate that if areaId is set, it still exists and is active
+        if (parsed.areaId) {
+          const area = areas.find(a => a.id === parsed.areaId && a.is_active !== false && a.status === 'active')
+          if (!area) {
+            // Area was deactivated — keep the lat/lng but clear the areaId
+            setPin({ ...parsed, areaId: null })
+            return
+          }
+        }
+        setPin(parsed)
+        return
+      } catch {}
+    }
+    // No pin saved yet — open picker
+    if (areas.some(a => a.status === 'active' && a.is_active !== false)) {
       setPickerOpen(true)
     }
   }, [areas, userId])
 
-  function saveArea(id: string) {
-    setAreaId(id)
-    localStorage.setItem(areaKey(userId), id)
+  function savePin(areaId: string | null, areaName: string, lat: number, lng: number) {
+    const newPin: DeliveryPin = { areaId, areaName, lat, lng }
+    setPin(newPin)
+    localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
   }
 
-  const selectedArea = areas.find(a => a.id === areaId)
-  const customerZoneId = selectedArea?.zone_id ?? null
+  const maxDistanceM = pricingSettings?.max_distance_m ?? 6000
 
-  // Compute delivery fee for a vendor given the current customer zone
-  function deliveryFeeForVendor(vendor: Vendor): number | null {
-    if (!customerZoneId || !vendor.zone_id) return null
-    const [pairA, pairB] = [customerZoneId, vendor.zone_id].sort()
-    const fare = zoneFares.find(f => f.zone_a === pairA && f.zone_b === pairB)
-    if (!fare?.fare_level_id) return null
-    return fareLevels.find(l => l.id === fare.fare_level_id)?.delivery_fee ?? null
+  function estimatedFeeForVendor(vendor: Vendor): number | null {
+    if (!pin || vendor.lat == null || vendor.lng == null) return null
+    const distM = estimateDeliveryDistance(vendor.lat, vendor.lng, pin.lat, pin.lng)
+    if (!pricingSettings || distM > maxDistanceM) return null
+    return calcDeliveryPrice(distM, pricingSettings).okada_fare
+  }
+
+  function vendorDistanceM(vendor: Vendor): number | null {
+    if (!pin || vendor.lat == null || vendor.lng == null) return null
+    return estimateDeliveryDistance(vendor.lat, vendor.lng, pin.lat, pin.lng)
   }
 
   const filtered = useMemo(() => {
@@ -78,12 +103,19 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
         const inMenuCategories = v.menuCategoryNames.some(n => n.toLowerCase().includes(chip))
         if (!inVendorCategory && !inMenuCategories) return false
       }
+      // Hide vendors where the straight-line estimate is already over max_distance_m
+      if (pin && v.lat != null && v.lng != null) {
+        const distM = estimateDeliveryDistance(v.lat, v.lng, pin.lat, pin.lng)
+        if (distM > maxDistanceM) return false
+      }
       return true
     })
-  }, [vendors, storeType, category, search])
+  }, [vendors, storeType, category, search, pin, maxDistanceM])
 
   const open = filtered.filter(v => v.is_open)
   const closed = filtered.filter(v => !v.is_open)
+
+  const displayName = pin?.areaName ?? 'Select area'
 
   return (
     <>
@@ -120,7 +152,7 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
             <span className="flex flex-col">
               <span className="text-[11px] text-ink-2">Deliver to</span>
               <span className="text-[14px] font-bold flex items-center gap-1">
-                {selectedArea ? areaDisplayName(selectedArea) : 'Select area'}
+                {displayName}
                 <ChevronDown size={13} strokeWidth={2.2} />
               </span>
             </span>
@@ -199,7 +231,7 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
               <h2 className="font-heading font-bold text-[16px] mt-1">Open now</h2>
               <div className="flex flex-col gap-3.5">
                 {open.map(v => (
-                  <VendorCard key={v.id} vendor={v} deliveryFee={deliveryFeeForVendor(v)} />
+                  <VendorCard key={v.id} vendor={v} estimatedFee={estimatedFeeForVendor(v)} />
                 ))}
               </div>
             </>
@@ -210,7 +242,7 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
               <h2 className="font-heading font-bold text-[16px] mt-1 text-ink-2">Closed</h2>
               <div className="flex flex-col gap-3.5 opacity-60">
                 {closed.map(v => (
-                  <VendorCard key={v.id} vendor={v} deliveryFee={deliveryFeeForVendor(v)} />
+                  <VendorCard key={v.id} vendor={v} estimatedFee={estimatedFeeForVendor(v)} />
                 ))}
               </div>
             </>
@@ -250,16 +282,16 @@ export function HomeClient({ userId, vendors, zones, areas, zoneFares, fareLevel
         <AreaPicker
           areas={areas}
           zones={zones}
-          selectedId={areaId}
-          onSave={saveArea}
-          onClose={areaId ? () => setPickerOpen(false) : undefined}
+          selectedId={pin?.areaId ?? ''}
+          onSave={savePin}
+          onClose={pin ? () => setPickerOpen(false) : undefined}
         />
       )}
     </>
   )
 }
 
-function VendorCard({ vendor, deliveryFee }: { vendor: Vendor; deliveryFee: number | null }) {
+function VendorCard({ vendor, estimatedFee }: { vendor: Vendor; estimatedFee: number | null }) {
   const showRating = vendor.rating_count >= 5
 
   return (
@@ -297,15 +329,12 @@ function VendorCard({ vendor, deliveryFee }: { vendor: Vendor; deliveryFee: numb
                 <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="#F5A524" />
               </svg>
               {vendor.rating_avg.toFixed(1)}
-              <span className="font-normal text-ink-2">({vendor.rating_count})</span>
             </span>
           ) : (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface text-ink-2">New</span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-warn-tint text-warn font-semibold">New</span>
           )}
-          {deliveryFee != null && (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-tint text-brand-ink">
-              {deliveryFee === 0 ? 'Free delivery' : `${formatMoney(deliveryFee)} delivery`}
-            </span>
+          {estimatedFee != null && (
+            <span className="text-ink-2">· Delivery ~{formatMoney(estimatedFee)}</span>
           )}
         </div>
       </div>

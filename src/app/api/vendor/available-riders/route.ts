@@ -17,18 +17,18 @@ export async function GET(req: NextRequest) {
   // Verify caller owns this vendor
   const { data: vendor } = await admin
     .from('vendors')
-    .select('id, area_id, zone_id')
+    .select('id, lat, lng, area_id, zone_id')
     .eq('id', vendorId)
     .eq('owner_id', user.id)
     .single()
 
   if (!vendor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Get vendor's location from their area
-  let vendorLat: number | null = null
-  let vendorLng: number | null = null
+  // Use vendor's direct lat/lng pin; fall back to area coordinates
+  let vendorLat: number | null = vendor.lat ?? null
+  let vendorLng: number | null = vendor.lng ?? null
 
-  if (vendor.area_id) {
+  if (vendorLat == null && vendor.area_id) {
     const { data: area } = await admin
       .from('areas')
       .select('lat, lng')
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     vendorLng = area?.lng ?? null
   }
 
-  if (!vendorLat && vendor.zone_id) {
+  if (vendorLat == null && vendor.zone_id) {
     const { data: area } = await admin
       .from('areas')
       .select('lat, lng')

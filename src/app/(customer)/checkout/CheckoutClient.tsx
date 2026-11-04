@@ -1,34 +1,47 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock, Info, Trash2 } from 'lucide-react'
+import { ArrowLeft, Lock, Info, Trash2, MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatMoney, areaDisplayName } from '@/lib/format'
+import { formatMoney } from '@/lib/format'
 import { useCart, cartSubtotal } from '@/store/cart'
 import { calcServiceFee, type ServiceFeeSettings } from '@/lib/serviceFee'
 import { Button } from '@/components/ui/Button'
-import type { Zone, ZoneFare, Area, FareLevel } from '@/types/database'
+import { AreaPicker } from '@/components/AreaPicker'
+import type { Zone, Area } from '@/types/database'
+
+interface DeliveryPin {
+  areaId: string | null
+  areaName: string
+  lat: number
+  lng: number
+}
+
+interface DeliveryQuote {
+  delivery_fee: number
+  distance_m: number
+  source: string
+  too_far: boolean
+  vendor_name: string
+}
 
 interface Props {
   userId: string | null
   zones: Zone[]
   areas: Area[]
-  fares: ZoneFare[]
-  fareLevels: FareLevel[]
   feeSettings: ServiceFeeSettings
 }
 
-export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSettings }: Props) {
+const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
+
+export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
 
-  const areaKey = `dart_area_${userId ?? 'guest'}`
-  const [customerAreaId, setCustomerAreaId] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem(`dart_area_${userId ?? 'guest'}`) ?? '' : '')
-  )
+  const [pin, setPin] = useState<DeliveryPin | null>(null)
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
   const [phone, setPhone] = useState('')
@@ -36,7 +49,37 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
   const [error, setError] = useState('')
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [quote, setQuote] = useState<DeliveryQuote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
   const submittingRef = useRef(false)
+
+  // Hydrate pin from localStorage
+  useEffect(() => {
+    const raw = localStorage.getItem(deliveryKey(userId))
+    if (raw) {
+      try { setPin(JSON.parse(raw)) } catch {}
+    }
+  }, [userId])
+
+  // Fetch delivery quote whenever the pin or cart vendor changes
+  useEffect(() => {
+    if (!pin || !cart) { setQuote(null); return }
+
+    setQuoteLoading(true)
+    fetch('/api/delivery-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendorId: cart.vendorId, pinLat: pin.lat, pinLng: pin.lng }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error) setQuote(data as DeliveryQuote)
+        else setQuote(null)
+      })
+      .catch(() => setQuote(null))
+      .finally(() => setQuoteLoading(false))
+  }, [pin?.lat, pin?.lng, cart?.vendorId])
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -48,25 +91,18 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
   }
 
   const subtotal = cartSubtotal(cart)
-  const selectedArea = areas.find(a => a.id === customerAreaId)
-  const customerZoneId = selectedArea?.zone_id ?? null
-  const vendorZoneId = (cart as any).vendorZoneId ?? null
+  const deliveryFee = quote?.delivery_fee ?? 0
+  const selectedArea = pin?.areaId ? areas.find(a => a.id === pin.areaId) : null
   const isGatePickup = selectedArea?.gate_pickup ?? false
-
-  let deliveryFee = 0
-  let riderPay = 0
-  if (customerZoneId && vendorZoneId) {
-    const [pairA, pairB] = [customerZoneId, vendorZoneId].sort()
-    const fare = fares.find(f => f.zone_a === pairA && f.zone_b === pairB) ?? null
-    if (fare?.fare_level_id) {
-      const level = fareLevels.find(l => l.id === fare.fare_level_id)
-      if (level) { deliveryFee = level.delivery_fee; riderPay = level.rider_pay }
-    }
-  }
-
   const serviceFee = calcServiceFee(subtotal, feeSettings)
   const total = subtotal + deliveryFee + serviceFee
-  const activeAreas = areas.filter(a => a.status === 'active')
+
+  function savePin(areaId: string | null, areaName: string, lat: number, lng: number) {
+    const newPin: DeliveryPin = { areaId, areaName, lat, lng }
+    setPin(newPin)
+    localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
+    setPickerOpen(false)
+  }
 
   async function placeOrder() {
     if (submittingRef.current) return
@@ -75,7 +111,8 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
       router.push(`/login?redirect=${encodeURIComponent('/checkout')}`)
       return
     }
-    if (!customerAreaId) { setError('Select your area'); return }
+    if (!pin) { setError('Select your delivery area'); return }
+    if (quote?.too_far) { setError('Your pin is too far from this vendor'); return }
     if (!isGatePickup && !landmark.trim()) { setError('Landmark is required'); return }
     if (!phone.trim()) { setError('Enter a phone number for the rider to call'); return }
 
@@ -89,7 +126,9 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cart,
-          customerAreaId,
+          areaId: pin.areaId,
+          pinLat: pin.lat,
+          pinLng: pin.lng,
           landmark: landmark.trim(),
           details: details.trim() || null,
           phone: phone.trim(),
@@ -97,13 +136,16 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
       })
 
       const json = await res.json()
-
       if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
       if (json.checkoutUrl) { clearCart(); window.location.href = json.checkoutUrl }
     } finally {
       setLoading(false)
       submittingRef.current = false
     }
+  }
+
+  function formatDistance(m: number) {
+    return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`
   }
 
   return (
@@ -123,30 +165,20 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
             <div className="flex items-center gap-3">
               {confirmClear ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmClear(false)}
-                    className="text-[13px] text-ink-2 bg-transparent border-0 cursor-pointer p-0"
-                  >
+                  <button type="button" onClick={() => setConfirmClear(false)}
+                    className="text-[13px] text-ink-2 bg-transparent border-0 cursor-pointer p-0">
                     Cancel
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => { clearCart(); router.push('/') }}
-                    className="text-[13px] font-semibold text-danger bg-transparent border-0 cursor-pointer p-0"
-                  >
+                  <button type="button" onClick={() => { clearCart(); router.push('/') }}
+                    className="text-[13px] font-semibold text-danger bg-transparent border-0 cursor-pointer p-0">
                     Clear cart
                   </button>
                 </>
               ) : (
                 <>
                   <Link href={`/vendor/${cart.vendorSlug}`} className="text-[13px] font-semibold text-brand no-underline">Add items</Link>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmClear(true)}
-                    aria-label="Clear cart"
-                    className="w-8 h-8 flex items-center justify-center text-ink-2 bg-transparent border-0 cursor-pointer rounded-lg hover:bg-surface -mr-1"
-                  >
+                  <button type="button" onClick={() => setConfirmClear(true)} aria-label="Clear cart"
+                    className="w-8 h-8 flex items-center justify-center text-ink-2 bg-transparent border-0 cursor-pointer rounded-lg hover:bg-surface -mr-1">
                     <Trash2 size={16} strokeWidth={2} />
                   </button>
                 </>
@@ -174,64 +206,52 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
         {/* Delivery address */}
         <section className="bg-white rounded-2xl p-4 flex flex-col gap-2.5">
           <h2 className="text-[15px] font-bold">Deliver to</h2>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-            Area
-            <select
-              value={customerAreaId}
-              onChange={e => {
-                setCustomerAreaId(e.target.value)
-                localStorage.setItem(areaKey, e.target.value)
-              }}
-              className="h-btn-sm px-3 rounded-xl border border-line bg-white font-body text-[15px] text-ink font-medium"
-            >
-              <option value="">Select area…</option>
-              {zones.map(zone => {
-                const zoneAreas = activeAreas.filter(a => a.zone_id === zone.id)
-                if (zoneAreas.length === 0) return null
-                return (
-                  <optgroup key={zone.id} label={zone.name}>
-                    {zoneAreas.map(a => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </optgroup>
-                )
-              })}
-            </select>
-          </label>
-          {isGatePickup && (
-            <div className="px-3 py-2.5 rounded-xl bg-brand-tint border border-brand/20 text-[13px] text-brand-ink leading-relaxed">
-              Your rider will wait at <span className="font-semibold">{selectedArea?.name}</span>. Please come out to collect your order.
+
+          {/* Delivery pin selector */}
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-2xl border border-line text-left hover:bg-surface transition-colors"
+          >
+            <MapPin size={18} stroke="#0B7A47" className="flex-none" />
+            <span className="flex-1 flex flex-col">
+              <span className="text-xs font-semibold text-ink-2">Delivery spot</span>
+              <span className="text-[14px] font-semibold text-ink">
+                {pin ? pin.areaName : 'Select area or pin on map'}
+              </span>
+            </span>
+            <span className="text-[13px] text-brand font-semibold">Change</span>
+          </button>
+
+          {quote?.too_far && (
+            <div className="px-3 py-2.5 rounded-xl bg-danger/5 border border-danger/20 text-[13px] text-danger leading-relaxed">
+              This spot is too far from {quote.vendor_name} for delivery.
             </div>
           )}
+
+          {isGatePickup && (
+            <div className="px-3 py-2.5 rounded-xl bg-brand-tint border border-brand/20 text-[13px] text-brand-ink leading-relaxed">
+              Your rider will wait at <span className="font-semibold">{selectedArea?.name}</span>. Please come out to collect.
+            </div>
+          )}
+
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             {isGatePickup ? 'Landmark (optional)' : 'Landmark (required)'}
-            <input
-              type="text"
-              value={landmark}
-              onChange={e => setLandmark(e.target.value)}
+            <input type="text" value={landmark} onChange={e => setLandmark(e.target.value)}
               placeholder={isGatePickup ? 'e.g. beside pharmacy kiosk' : 'e.g. brown gate, beside pharmacy'}
-              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
-            />
+              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
           </label>
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Additional details (optional)
-            <input
-              type="text"
-              value={details}
-              onChange={e => setDetails(e.target.value)}
+            <input type="text" value={details} onChange={e => setDetails(e.target.value)}
               placeholder="Floor, gate, colour of house..."
-              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
-            />
+              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
           </label>
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
             Phone for the rider to call
-            <input
-              type="tel"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
+            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
               placeholder="0803 000 0000"
-              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
-            />
+              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink" />
           </label>
         </section>
 
@@ -243,15 +263,21 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
             <span>{formatMoney(subtotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-ink-2">Delivery{selectedArea ? ` · ${areaDisplayName(selectedArea)}` : ''}</span>
-            <span>{deliveryFee > 0 ? formatMoney(deliveryFee) : customerZoneId ? 'Free' : '—'}</span>
+            <span className="text-ink-2">
+              Delivery
+              {quote && !quote.too_far ? ` · ${formatDistance(quote.distance_m)}` : ''}
+            </span>
+            <span>
+              {quoteLoading ? (
+                <span className="inline-block w-3 h-3 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
+              ) : quote && !quote.too_far ? (
+                formatMoney(deliveryFee)
+              ) : pin ? '—' : '—'}
+            </span>
           </div>
           <div className="flex justify-between text-sm items-center">
-            <button
-              type="button"
-              onClick={() => setFeeInfoOpen(p => !p)}
-              className="flex items-center gap-1 text-ink-2 bg-transparent border-0 cursor-pointer p-0"
-            >
+            <button type="button" onClick={() => setFeeInfoOpen(p => !p)}
+              className="flex items-center gap-1 text-ink-2 bg-transparent border-0 cursor-pointer p-0">
               Service fee
               <Info size={13} strokeWidth={2} className="text-ink-2/60" />
             </button>
@@ -278,7 +304,13 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
           </span>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
-        <Button onClick={placeOrder} loading={loading} fullWidth size="lg">
+        <Button
+          onClick={placeOrder}
+          loading={loading}
+          disabled={!pin || quote?.too_far === true}
+          fullWidth
+          size="lg"
+        >
           Pay {formatMoney(total)}
         </Button>
         <p className="text-[12px] text-ink-2 text-center leading-relaxed">
@@ -288,6 +320,16 @@ export function CheckoutClient({ userId, zones, areas, fares, fareLevels, feeSet
           <Link href="/refunds" className="text-brand underline-offset-2 hover:underline">Refund Policy</Link>
         </p>
       </div>
+
+      {pickerOpen && (
+        <AreaPicker
+          areas={areas}
+          zones={zones}
+          selectedId={pin?.areaId ?? ''}
+          onSave={savePin}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { parseServiceFeeSettings, calcServiceFee } from '@/lib/serviceFee'
+import { getRoadDistance } from '@/lib/server/getRoadDistance'
+import { calcDeliveryPrice, type DeliveryPricingSettings } from '@/lib/pricing/delivery'
 import type { Cart, CartItem } from '@/types/database'
 
 export async function POST(req: NextRequest) {
@@ -15,9 +17,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { cart, customerAreaId, landmark, details, phone }: {
+    const {
+      cart,
+      areaId,     // string | null — null for custom map pin
+      pinLat,
+      pinLng,
+      landmark,
+      details,
+      phone,
+    }: {
       cart: Cart
-      customerAreaId: string
+      areaId: string | null
+      pinLat: number
+      pinLng: number
       landmark: string
       details: string | null
       phone: string
@@ -27,32 +39,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     }
 
-    // 1. Load customer area → zone
-    const { data: customerArea, error: areaErr } = await admin
-      .from('areas')
-      .select('id, name, zone_id, status, gate_pickup')
-      .eq('id', customerAreaId)
-      .eq('status', 'active')
-      .single()
-
-    if (areaErr || !customerArea || !customerArea.zone_id) {
-      return NextResponse.json({ error: 'Area not found or not yet serviceable' }, { status: 400 })
+    if (pinLat == null || pinLng == null) {
+      return NextResponse.json({ error: 'Delivery pin required' }, { status: 400 })
     }
 
-    const customerZoneId = customerArea.zone_id
+    // 1. Load customer area (optional — only for gate pickup and zone recording)
+    let customerArea: { id: string; name: string; zone_id: string | null; gate_pickup: boolean } | null = null
+    let customerZone: { id: string; name: string } | null = null
 
-    const { data: customerZone, error: zoneErr } = await admin
-      .from('zones')
-      .select('id, name, is_active')
-      .eq('id', customerZoneId)
-      .eq('is_active', true)
-      .single()
+    if (areaId) {
+      const { data: area } = await admin
+        .from('areas')
+        .select('id, name, zone_id, gate_pickup')
+        .eq('id', areaId)
+        .eq('status', 'active')
+        .single()
+      customerArea = area
 
-    if (zoneErr || !customerZone) {
-      return NextResponse.json({ error: 'Zone not found or inactive' }, { status: 400 })
+      if (area?.zone_id) {
+        const { data: zone } = await admin
+          .from('zones')
+          .select('id, name')
+          .eq('id', area.zone_id)
+          .eq('is_active', true)
+          .single()
+        customerZone = zone
+      }
     }
 
-    // 2. Load vendor (must be open, with zone_id)
+    // 2. Load vendor (must be open and have a lat/lng)
     const { data: vendor, error: vendorErr } = await admin
       .from('vendors')
       .select('*')
@@ -62,6 +77,10 @@ export async function POST(req: NextRequest) {
 
     if (vendorErr || !vendor) {
       return NextResponse.json({ error: 'Vendor is not currently available' }, { status: 400 })
+    }
+
+    if (vendor.lat == null || vendor.lng == null) {
+      return NextResponse.json({ error: 'Vendor location not configured — cannot accept orders yet' }, { status: 400 })
     }
 
     // 3. Recompute prices from DB
@@ -129,72 +148,87 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4. Load service fee settings
-    const { data: feeRows } = await admin
-      .from('app_settings')
-      .select('key, value')
-      .in('key', [
+    // 4. Load service fee + delivery pricing settings
+    const [{ data: feeRows }, { data: pricingSettings }] = await Promise.all([
+      admin.from('app_settings').select('key, value').in('key', [
         'service_fee_enabled', 'service_fee_type', 'service_fee_percent',
         'service_fee_min', 'service_fee_max', 'service_fee_flat',
-      ])
-    const feeSettings = parseServiceFeeSettings(feeRows ?? [])
+      ]),
+      admin.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
+    ])
 
-    // 5. Look up delivery fee via fare level
-    let deliveryFee = 0
-    let riderPay = 0
-
-    if (vendor.zone_id) {
-      const [pairA, pairB] = [vendor.zone_id, customerZoneId].sort()
-      const { data: fare } = await admin
-        .from('zone_fares')
-        .select('fare_level_id, is_serviceable, fare_levels(rider_pay, delivery_fee)')
-        .eq('zone_a', pairA)
-        .eq('zone_b', pairB)
-        .maybeSingle()
-
-      if (fare?.fare_levels) {
-        const level = (Array.isArray(fare.fare_levels) ? fare.fare_levels[0] : fare.fare_levels) as { rider_pay: number; delivery_fee: number }
-        if (level) { deliveryFee = level.delivery_fee; riderPay = level.rider_pay }
-      }
+    if (!pricingSettings) {
+      return NextResponse.json({ error: 'Pricing settings not configured' }, { status: 500 })
     }
 
+    const feeSettings = parseServiceFeeSettings(feeRows ?? [])
+
+    // 5. Compute delivery price via road distance
+    const { distance_m, source } = await getRoadDistance(
+      vendor.lat, vendor.lng, pinLat, pinLng
+    )
+
+    const settings = pricingSettings as DeliveryPricingSettings
+    if (distance_m > settings.max_distance_m) {
+      return NextResponse.json({ error: 'Delivery spot is too far from the vendor' }, { status: 400 })
+    }
+
+    const { okada_fare, rider_pay, delivery_fee: platformDeliveryCost } = calcDeliveryPrice(distance_m, settings)
+
     const serviceFee = calcServiceFee(subtotal, feeSettings)
-    const total = subtotal + deliveryFee + serviceFee
+    const total = subtotal + okada_fare + serviceFee
     const commissionAmount = Math.round(subtotal * vendor.commission_rate)
 
-    // 6. Generate delivery PIN
+    // 6. Generate delivery PIN and order code
     const deliveryPin = String(Math.floor(1000 + Math.random() * 9000))
-
-    // 7. Generate order code
     const { data: orderCode, error: codeErr } = await admin.rpc('generate_order_code').single()
     if (codeErr || !orderCode) {
       console.error('generate_order_code failed:', codeErr)
       return NextResponse.json({ error: 'Failed to generate order code' }, { status: 500 })
     }
 
-    // 8. Create order
+    // 7. Create order with snapshot columns
     const { data: order, error: orderErr } = await admin
       .from('orders')
       .insert({
         customer_id: user.id,
         vendor_id: vendor.id,
-        zone_id: customerZoneId,
-        area_id: customerArea.id,
-        area_name: customerArea.name,
-        is_gate_pickup: customerArea.gate_pickup ?? false,
-        address_zone: customerZone.name,
+        zone_id: customerZone?.id ?? null,
+        area_id: customerArea?.id ?? null,
+        area_name: customerArea?.name ?? null,
+        is_gate_pickup: customerArea?.gate_pickup ?? false,
+        address_zone: customerZone?.name ?? 'Custom location',
         address_landmark: landmark,
         address_details: details,
         address_phone: phone,
         status: 'pending_payment',
         subtotal,
-        delivery_fee: deliveryFee,
+        delivery_fee: okada_fare,   // what customer pays (existing column)
         service_fee: serviceFee,
         total,
         commission_amount: commissionAmount,
-        rider_pay: riderPay,
+        rider_pay: rider_pay,       // existing column = rider_pay (okada_fare + extra)
         delivery_pin: deliveryPin,
         code: orderCode,
+        // New snapshot columns
+        pin_lat: pinLat,
+        pin_lng: pinLng,
+        distance_m,
+        distance_source: source,
+        okada_fare_kobo: okada_fare,
+        rider_pay_kobo: rider_pay,
+        delivery_fee_kobo: platformDeliveryCost,
+        pricing_snapshot: {
+          base_fare_kobo: settings.base_fare_kobo,
+          per_km_kobo: settings.per_km_kobo,
+          min_fare_kobo: settings.min_fare_kobo,
+          round_to_kobo: settings.round_to_kobo,
+          rider_extra_kobo: settings.rider_extra_kobo,
+          gocart_extra_kobo: settings.gocart_extra_kobo,
+          distance_m,
+          source,
+          computed_at: new Date().toISOString(),
+        },
       })
       .select()
       .single()
@@ -204,12 +238,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
 
-    // 9. Insert order items
+    // 8. Insert order items
     await admin.from('order_items').insert(
       orderItems.map(oi => ({ ...oi, order_id: order.id }))
     )
 
-    // 10. Log initial event
+    // 9. Log initial event
     await admin.from('order_events').insert({
       order_id: order.id,
       from_status: null,
@@ -218,7 +252,7 @@ export async function POST(req: NextRequest) {
       note: 'Order created',
     })
 
-    // 11. Init Monnify payment
+    // 10. Init Monnify payment
     const reference = `GC-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
 
     await admin.from('payments').insert({
@@ -232,7 +266,7 @@ export async function POST(req: NextRequest) {
     const monnifyRes = await initMonnifyTransaction({
       reference,
       orderId: order.id,
-      amount: total / 100, // Monnify uses naira
+      amount: total / 100,
       orderCode: order.code,
       customerPhone: phone,
     })

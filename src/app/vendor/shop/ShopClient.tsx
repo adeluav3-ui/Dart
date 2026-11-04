@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, lazy, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { VendorNav } from '@/components/vendor/VendorNav'
 import type { Vendor, VendorHours, Area } from '@/types/database'
+
+const MapPicker = lazy(() => import('@/components/MapPicker').then(m => ({ default: m.MapPicker })))
 
 interface Props {
   vendor: Vendor
@@ -68,6 +70,13 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
   // Push
   const [pushEnabled, setPushEnabled] = useState(hasPushSub)
   const [enablingPush, setEnablingPush] = useState(false)
+
+  // Shop location pin
+  const [vendorLat, setVendorLat] = useState(vendor.lat)
+  const [vendorLng, setVendorLng] = useState(vendor.lng)
+  const [showLocationMap, setShowLocationMap] = useState(false)
+  const [savingLocation, setSavingLocation] = useState(false)
+  const [locationSaved, setLocationSaved] = useState(false)
 
   async function saveDetails() {
     setSavingDetails(true)
@@ -185,7 +194,31 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
     }
   }
 
+  async function saveLocation(lat: number, lng: number) {
+    setSavingLocation(true)
+    await supabase.from('vendors').update({ lat, lng }).eq('id', vendor.id)
+    setVendorLat(lat)
+    setVendorLng(lng)
+    setSavingLocation(false)
+    setLocationSaved(true)
+    setShowLocationMap(false)
+    setTimeout(() => setLocationSaved(false), 2000)
+  }
+
   const coverSrc = coverPreview ?? coverUrl
+
+  if (showLocationMap) {
+    return (
+      <Suspense fallback={null}>
+        <MapPicker
+          initialLat={vendorLat ?? undefined}
+          initialLng={vendorLng ?? undefined}
+          onConfirm={saveLocation}
+          onClose={() => setShowLocationMap(false)}
+        />
+      </Suspense>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-canvas font-body text-ink pb-28">
@@ -409,6 +442,38 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
               {enablingPush ? 'Enabling…' : 'Enable order alerts'}
             </button>
           )}
+        </section>
+
+        {/* Shop location */}
+        <section className="bg-white rounded-2xl p-4 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="font-bold text-base">Shop location</h2>
+              <p className="text-xs text-ink-2 mt-0.5">
+                Used to calculate delivery distance and fees. Required to accept orders.
+              </p>
+            </div>
+            {vendorLat != null && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-tint text-brand-ink shrink-0">Set</span>
+            )}
+          </div>
+          {vendorLat != null ? (
+            <p className="text-[13px] text-ink-2">
+              {vendorLat.toFixed(5)}, {vendorLng?.toFixed(5)}
+            </p>
+          ) : (
+            <p className="text-[13px] text-danger font-medium">
+              Pin not set — customers cannot place orders until you set it.
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={savingLocation}
+            onClick={() => setShowLocationMap(true)}
+            className="h-10 rounded-xl border border-brand bg-brand-tint text-brand font-bold text-sm border-0 disabled:opacity-50"
+          >
+            {locationSaved ? 'Location saved ✓' : savingLocation ? 'Saving…' : vendorLat != null ? 'Update location' : 'Set shop location'}
+          </button>
         </section>
 
         {/* Switch to customer app */}

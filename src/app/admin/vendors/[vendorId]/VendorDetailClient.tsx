@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import type { Vendor, MenuCategory, MenuItem, OptionGroup, Option } from '@/types/database'
+
+const MapPicker = lazy(() => import('@/components/MapPicker').then(m => ({ default: m.MapPicker })))
 
 interface Props {
   vendor: Vendor
@@ -31,6 +33,8 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
   const [optionGroups, setOptionGroups] = useState(initialGroups)
   const [options, setOptions] = useState(initialOptions)
   const [saving, setSaving] = useState(false)
+  const [savingPin, setSavingPin] = useState(false)
+  const [showPinMap, setShowPinMap] = useState(false)
   const [allRiders, setAllRiders] = useState<RiderRow[]>([])
   const supabase = createClient()
 
@@ -75,6 +79,14 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
       payout_account_name: vendor.payout_account_name,
     }).eq('id', vendor.id)
     setSaving(false)
+  }
+
+  async function saveVendorPin(lat: number, lng: number) {
+    setSavingPin(true)
+    await supabase.from('vendors').update({ lat, lng }).eq('id', vendor.id)
+    setVendor(v => ({ ...v, lat, lng }))
+    setSavingPin(false)
+    setShowPinMap(false)
   }
 
   async function addCategory() {
@@ -134,6 +146,19 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
     if (data) setOptions(p => [...p, data as Option])
   }
 
+  if (showPinMap) {
+    return (
+      <Suspense fallback={null}>
+        <MapPicker
+          initialLat={vendor.lat ?? undefined}
+          initialLng={vendor.lng ?? undefined}
+          onConfirm={saveVendorPin}
+          onClose={() => setShowPinMap(false)}
+        />
+      </Suspense>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -168,6 +193,19 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
           <Input label="Account name" value={vendor.payout_account_name ?? ''}
             onChange={e => setVendor(v => ({ ...v, payout_account_name: e.target.value }))} />
           <Button onClick={saveVendorInfo} loading={saving} size="lg">Save changes</Button>
+
+          {/* Shop pin */}
+          <div className="border-t border-line pt-4 flex flex-col gap-2">
+            <p className="text-sm font-semibold">Shop location pin</p>
+            {vendor.lat != null ? (
+              <p className="text-xs text-ink-2">{vendor.lat.toFixed(5)}, {vendor.lng?.toFixed(5)}</p>
+            ) : (
+              <p className="text-xs text-danger font-medium">Not set — vendor cannot receive orders</p>
+            )}
+            <Button onClick={() => setShowPinMap(true)} loading={savingPin} size="sm">
+              {vendor.lat != null ? 'Update pin' : 'Set pin'}
+            </Button>
+          </div>
         </div>
       )}
 
