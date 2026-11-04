@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
 import { VendorNav } from '@/components/vendor/VendorNav'
-import type { Vendor, Order, OrderItem, OrderStatus } from '@/types/database'
+import { isInsideCoverage } from '@/lib/coverage'
+import type { Vendor, Order, OrderItem, OrderStatus, CoverageArea } from '@/types/database'
 
 type Tab = 'paid' | 'accepted' | 'ready'
 const TABS: { value: Tab; label: string }[] = [
@@ -57,6 +58,7 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
   const [prepTimes, setPrepTimes] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(vendor.is_open)
+  const [coverageError, setCoverageError] = useState('')
 
   const [availableRiders, setAvailableRiders] = useState<AvailableRider[] | null>(null)
   const [loadingRiders, setLoadingRiders] = useState(false)
@@ -193,6 +195,24 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
 
   async function toggleOpen() {
     const newOpen = !isOpen
+    setCoverageError('')
+
+    // Before opening, verify vendor location is inside a coverage area
+    if (newOpen && vendor.lat != null && vendor.lng != null) {
+      const { data: coverageRows } = await supabase
+        .from('coverage_areas')
+        .select('*')
+        .eq('is_active', true)
+      const coverageAreas = (coverageRows ?? []) as CoverageArea[]
+      if (coverageAreas.length > 0) {
+        const inside = isInsideCoverage(vendor.lat, vendor.lng, coverageAreas)
+        if (!inside) {
+          setCoverageError('Your shop location is outside the areas we cover. Contact GoCart support.')
+          return
+        }
+      }
+    }
+
     setIsOpen(newOpen)
     await supabase.from('vendors').update({ is_open: newOpen }).eq('id', vendor.id)
   }
@@ -306,6 +326,9 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
             />
           </button>
         </div>
+        {coverageError && (
+          <p className="text-xs text-[#F9CBCB] mt-1 px-1">{coverageError}</p>
+        )}
       </header>
 
       {/* Setup checklist (shown while not verified) */}

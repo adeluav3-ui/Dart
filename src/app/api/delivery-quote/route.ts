@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRoadDistance } from '@/lib/server/getRoadDistance'
 import { calcDeliveryPrice, type DeliveryPricingSettings } from '@/lib/pricing/delivery'
+import { isInsideCoverage } from '@/lib/coverage'
+import type { CoverageArea } from '@/types/database'
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +15,20 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    const [{ data: vendor }, { data: settings }] = await Promise.all([
+    const [{ data: vendor }, { data: settings }, { data: coverageRows }] = await Promise.all([
       admin.from('vendors').select('lat, lng, name').eq('id', vendorId).single(),
       admin.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
+      admin.from('coverage_areas').select('*').eq('is_active', true),
     ])
+
+    // Coverage check — skip if no active areas defined
+    const coverageAreas = (coverageRows ?? []) as CoverageArea[]
+    if (coverageAreas.length > 0) {
+      const inside = isInsideCoverage(pinLat, pinLng, coverageAreas)
+      if (!inside) {
+        return NextResponse.json({ error: 'Delivery spot is outside our coverage area', code: 'OUTSIDE_COVERAGE' }, { status: 400 })
+      }
+    }
 
     if (!vendor?.lat || !vendor?.lng) {
       return NextResponse.json({ error: 'Vendor location not set' }, { status: 400 })

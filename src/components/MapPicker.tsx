@@ -4,19 +4,22 @@ import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState } from 'react'
 import { X, Navigation, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { isInsideCoverage } from '@/lib/coverage'
+import type { CoverageArea } from '@/types/database'
 
 interface Props {
   initialLat?: number
   initialLng?: number
   onConfirm: (lat: number, lng: number) => void
   onClose: () => void
+  coverageAreas?: CoverageArea[]
 }
 
 // OOUTH Main Gate, Sagamu
 const DEFAULT_LAT = 6.7073
 const DEFAULT_LNG = 3.8858
 
-export function MapPicker({ initialLat, initialLng, onConfirm, onClose }: Props) {
+export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverageAreas }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [center, setCenter] = useState({
@@ -24,6 +27,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose }: Props)
     lng: initialLng ?? DEFAULT_LNG,
   })
   const [locating, setLocating] = useState(false)
+  const [outsideCoverage, setOutsideCoverage] = useState(false)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -50,6 +54,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose }: Props)
       map.on('move', () => {
         const { lat, lng } = map.getCenter()
         setCenter({ lat, lng })
+        setOutsideCoverage(false) // clear error when map moves
       })
 
       mapRef.current = map
@@ -131,7 +136,18 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose }: Props)
         <p className="text-[13px] text-ink-2 text-center mb-3">
           Move the map so the pin is on your delivery spot
         </p>
-        <Button fullWidth size="lg" onClick={() => onConfirm(center.lat, center.lng)}>
+        {outsideCoverage && (
+          <p className="text-[13px] text-warn text-center mb-3 leading-snug">
+            This spot is outside our delivery area. Move the pin to a covered part of Sagamu.
+          </p>
+        )}
+        <Button fullWidth size="lg" onClick={() => {
+          if (coverageAreas && coverageAreas.length > 0) {
+            const inside = isInsideCoverage(center.lat, center.lng, coverageAreas)
+            if (!inside) { setOutsideCoverage(true); return }
+          }
+          onConfirm(center.lat, center.lng)
+        }}>
           Deliver here
         </Button>
       </div>

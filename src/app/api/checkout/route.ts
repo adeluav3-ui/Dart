@@ -4,7 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { parseServiceFeeSettings, calcServiceFee } from '@/lib/serviceFee'
 import { getRoadDistance } from '@/lib/server/getRoadDistance'
 import { calcDeliveryPrice, type DeliveryPricingSettings } from '@/lib/pricing/delivery'
-import type { Cart, CartItem } from '@/types/database'
+import { isInsideCoverage } from '@/lib/coverage'
+import type { Cart, CartItem, CoverageArea } from '@/types/database'
 
 export async function POST(req: NextRequest) {
   try {
@@ -148,14 +149,24 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4. Load service fee + delivery pricing settings
-    const [{ data: feeRows }, { data: pricingSettings }] = await Promise.all([
+    // 4. Load service fee, delivery pricing settings, and coverage areas
+    const [{ data: feeRows }, { data: pricingSettings }, { data: coverageRows }] = await Promise.all([
       admin.from('app_settings').select('key, value').in('key', [
         'service_fee_enabled', 'service_fee_type', 'service_fee_percent',
         'service_fee_min', 'service_fee_max', 'service_fee_flat',
       ]),
       admin.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
+      admin.from('coverage_areas').select('*').eq('is_active', true),
     ])
+
+    // Coverage check — skip if no active areas defined
+    const coverageAreas = (coverageRows ?? []) as CoverageArea[]
+    if (coverageAreas.length > 0) {
+      const inside = isInsideCoverage(pinLat, pinLng, coverageAreas)
+      if (!inside) {
+        return NextResponse.json({ error: 'Delivery spot is outside our coverage area' }, { status: 400 })
+      }
+    }
 
     if (!pricingSettings) {
       return NextResponse.json({ error: 'Pricing settings not configured' }, { status: 500 })

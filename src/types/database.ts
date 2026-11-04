@@ -186,6 +186,24 @@ export interface AreaRequest {
   created_at: string
 }
 
+export interface CoverageArea {
+  id: string
+  name: string
+  polygon: { type: 'Polygon'; coordinates: number[][][] } | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CoverageWaitlistEntry {
+  id: string
+  email: string | null
+  lat: number | null
+  lng: number | null
+  created_at: string
+  user_id: string | null
+}
+
 export interface FareLevel {
   id: string
   name: string

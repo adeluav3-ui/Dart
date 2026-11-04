@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { HomeClient } from '../HomeClient'
-import type { Vendor, Zone, Area, DeliveryPricingSettings } from '@/types/database'
+import type { Vendor, Zone, Area, DeliveryPricingSettings, CoverageArea } from '@/types/database'
 
 export const metadata: Metadata = { robots: { index: false } }
 export const dynamic = 'force-dynamic'
@@ -15,6 +15,7 @@ export default async function HomePage() {
     { data: zones },
     { data: areas },
     { data: pricingSettings },
+    { data: coverageAreas },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -26,6 +27,7 @@ export default async function HomePage() {
     supabase.from('zones').select('*').eq('is_active', true).order('name'),
     supabase.from('areas').select('*').eq('is_active', true).order('status').order('sort_order'),
     supabase.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
+    supabase.from('coverage_areas').select('*').eq('is_active', true),
   ])
 
   const vendors: (Vendor & { menuCategoryNames: string[] })[] = (rawVendors ?? []).map((v: any) => {
@@ -43,6 +45,7 @@ export default async function HomePage() {
       zones={(zones as Zone[]) ?? []}
       areas={(areas as Area[]) ?? []}
       pricingSettings={(pricingSettings as DeliveryPricingSettings) ?? null}
+      coverageAreas={(coverageAreas as CoverageArea[]) ?? []}
     />
   )
 }

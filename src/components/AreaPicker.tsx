@@ -5,7 +5,7 @@ import { X, Search, Navigation, Map } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { areaDisplayName } from '@/lib/format'
-import type { Area, Zone } from '@/types/database'
+import type { Area, Zone, CoverageArea } from '@/types/database'
 
 // Lazy-load MapPicker to avoid pulling Leaflet into the initial bundle
 const MapPicker = lazy(() => import('./MapPicker').then(m => ({ default: m.MapPicker })))
@@ -16,6 +16,7 @@ interface Props {
   selectedId: string
   onSave: (areaId: string | null, areaName: string, lat: number, lng: number) => void
   onClose?: () => void
+  coverageAreas?: CoverageArea[]
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -47,12 +48,15 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
   }
 }
 
-export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props) {
+export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverageAreas }: Props) {
   const [selected, setSelected] = useState(selectedId)
   const [search, setSearch] = useState('')
   const [locating, setLocating] = useState(false)
   const [locError, setLocError] = useState('')
   const [gpsSuggestedId, setGpsSuggestedId] = useState<string | null>(null)
+  // Store raw GPS fix coords so the delivery pin uses the actual location, not area centroid
+  const [gpsLat, setGpsLat] = useState<number | null>(null)
+  const [gpsLng, setGpsLng] = useState<number | null>(null)
   const [waitlistArea, setWaitlistArea] = useState<string | null>(null)
   const [waitlistAreaName, setWaitlistAreaName] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
@@ -123,6 +127,10 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const { latitude: lat, longitude: lng } = pos.coords
+        // Store raw GPS fix — used as the delivery pin in handleContinue
+        setGpsLat(lat)
+        setGpsLng(lng)
+
         let nearest: Area | null = null
         let nearestDist = Infinity
         for (const a of activeAreas) {
@@ -185,6 +193,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
   function handleContinue() {
     const area = activeAreas.find(a => a.id === selected && a.status === 'active')
     if (!area || area.lat == null || area.lng == null) return
+    const wasGpsSuggested = !!gpsSuggestedId
     if (gpsSuggestedId) {
       supabase.from('location_detection_log').insert({
         area_id_suggested: gpsSuggestedId,
@@ -192,7 +201,11 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
       }).then(() => {})
       setGpsSuggestedId(null)
     }
-    onSave(area.id, areaDisplayName(area), area.lat, area.lng)
+    // If this was GPS-suggested, use the raw GPS coordinates as the pin (not area centroid)
+    // so the rider navigates to the customer's actual location
+    const pinLat = (wasGpsSuggested && gpsLat != null) ? gpsLat : area.lat
+    const pinLng = (wasGpsSuggested && gpsLng != null) ? gpsLng : area.lng
+    onSave(area.id, areaDisplayName(area), pinLat, pinLng)
   }
 
   function handleMapConfirm(lat: number, lng: number) {
@@ -214,6 +227,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose }: Props)
           initialLng={currentPin?.lng}
           onConfirm={handleMapConfirm}
           onClose={() => setShowMap(false)}
+          coverageAreas={coverageAreas}
         />
       </Suspense>
     )

@@ -10,7 +10,9 @@ import { useCart, cartSubtotal } from '@/store/cart'
 import { calcServiceFee, type ServiceFeeSettings } from '@/lib/serviceFee'
 import { Button } from '@/components/ui/Button'
 import { AreaPicker } from '@/components/AreaPicker'
-import type { Zone, Area } from '@/types/database'
+import { OutOfCoveragePanel } from '@/components/OutOfCoveragePanel'
+import { isInsideCoverage } from '@/lib/coverage'
+import type { Zone, Area, CoverageArea } from '@/types/database'
 
 interface DeliveryPin {
   areaId: string | null
@@ -32,16 +34,18 @@ interface Props {
   zones: Zone[]
   areas: Area[]
   feeSettings: ServiceFeeSettings
+  coverageAreas: CoverageArea[]
 }
 
 const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
 
-export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
+export function CheckoutClient({ userId, zones, areas, feeSettings, coverageAreas }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
 
   const [pin, setPin] = useState<DeliveryPin | null>(null)
+  const [pinOutsideCoverage, setPinOutsideCoverage] = useState(false)
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
   const [phone, setPhone] = useState('')
@@ -54,12 +58,20 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
   const [quoteLoading, setQuoteLoading] = useState(false)
   const submittingRef = useRef(false)
 
-  // Hydrate pin from localStorage
+  // Hydrate pin from localStorage and check coverage
   useEffect(() => {
     const raw = localStorage.getItem(deliveryKey(userId))
     if (raw) {
-      try { setPin(JSON.parse(raw)) } catch {}
+      try {
+        const parsed = JSON.parse(raw) as DeliveryPin
+        setPin(parsed)
+        if (coverageAreas.length > 0) {
+          const inside = isInsideCoverage(parsed.lat, parsed.lng, coverageAreas)
+          setPinOutsideCoverage(!inside)
+        }
+      } catch {}
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   // Fetch delivery quote whenever the pin or cart vendor changes
@@ -102,6 +114,12 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
     setPin(newPin)
     localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
+    if (coverageAreas.length > 0) {
+      const inside = isInsideCoverage(lat, lng, coverageAreas)
+      setPinOutsideCoverage(!inside)
+    } else {
+      setPinOutsideCoverage(false)
+    }
   }
 
   async function placeOrder() {
@@ -304,15 +322,24 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
           </span>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
-        <Button
-          onClick={placeOrder}
-          loading={loading}
-          disabled={!pin || quote?.too_far === true}
-          fullWidth
-          size="lg"
-        >
-          Pay {formatMoney(total)}
-        </Button>
+        {pinOutsideCoverage && pin ? (
+          <OutOfCoveragePanel
+            lat={pin.lat}
+            lng={pin.lng}
+            userId={userId}
+            onChangeSpot={() => setPickerOpen(true)}
+          />
+        ) : (
+          <Button
+            onClick={placeOrder}
+            loading={loading}
+            disabled={!pin || quote?.too_far === true}
+            fullWidth
+            size="lg"
+          >
+            Pay {formatMoney(total)}
+          </Button>
+        )}
         <p className="text-[12px] text-ink-2 text-center leading-relaxed">
           By paying you agree to the{' '}
           <Link href="/terms" className="text-brand underline-offset-2 hover:underline">Terms of Use</Link>
@@ -328,6 +355,7 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
           selectedId={pin?.areaId ?? ''}
           onSave={savePin}
           onClose={() => setPickerOpen(false)}
+          coverageAreas={coverageAreas}
         />
       )}
     </div>
