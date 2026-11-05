@@ -20,7 +20,7 @@ const DEFAULT: Omit<DeliveryPricingSettings, 'id' | 'updated_at'> = {
   round_to_kobo: 5000,
   rider_extra_kobo: 10000,
   gocart_extra_kobo: 10000,
-  max_distance_m: 6000,
+  max_distance_m: 7000,
   daily_google_call_cap: 400,
 }
 

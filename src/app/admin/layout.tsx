@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { AdminSignOut } from './AdminSignOut'
+import { AdminSidebar } from './AdminSidebar'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -17,43 +16,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!profile || profile.role !== 'admin') redirect('/')
 
   return (
-    <div className="min-h-screen bg-canvas font-body text-ink flex flex-col">
-      <header className="bg-ink text-white px-5 py-3 flex items-center justify-between">
-        <span className="font-heading font-extrabold text-xl">GoCart Admin</span>
-        <AdminSignOut />
-      </header>
-
-      {/* Side nav — horizontal scroll on mobile */}
-      <nav className="bg-[#1E2024] text-white flex gap-0 overflow-x-auto scrollbar-hide">
-        {[
-          { href: '/admin', label: 'Live' },
-          { href: '/admin/dispatch', label: 'Dispatch' },
-          { href: '/admin/users', label: 'Users' },
-          { href: '/admin/vendors', label: 'Vendors' },
-          { href: '/admin/zones', label: 'Zones' },
-          { href: '/admin/areas', label: 'Areas' },
-          { href: '/admin/areas/pins', label: 'Area pins' },
-          { href: '/admin/prices', label: 'Delivery prices' },
-          { href: '/admin/coverage', label: 'Coverage' },
-          { href: '/admin/fees', label: 'Fees' },
-          { href: '/admin/riders', label: 'Riders' },
-          { href: '/admin/money', label: 'Money' },
-          { href: '/admin/metrics', label: 'Metrics' },
-          { href: '/admin/review', label: 'Review' },
-          { href: '/admin/applications', label: 'Applications' },
-          { href: '/admin/support', label: 'Support' },
-        ].map(item => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex-none px-4 py-3 text-[13px] font-semibold text-[#B9BEC4] hover:text-white no-underline whitespace-nowrap"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-
-      <main className="flex-1 p-4">{children}</main>
+    <div className="min-h-screen bg-canvas font-body text-ink">
+      <AdminSidebar />
+      {/* Desktop: offset for sidebar. Mobile: offset for top bar. */}
+      <div className="lg:pl-[220px] pt-14 lg:pt-0">
+        {children}
+      </div>
     </div>
   )
 }
