@@ -19,54 +19,23 @@ interface Props {
   coverageAreas?: CoverageArea[]
 }
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371
-  const dLat = (lat2 - lat1) * (Math.PI / 180)
-  const dLng = (lng2 - lng1) * (Math.PI / 180)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.asin(Math.sqrt(a))
-}
-
 function normalizeText(s: string) {
   return s.toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'User-Agent': 'GoCart Delivery (gocart.app)' } }
-    )
-    if (!res.ok) return ''
-    const data = await res.json()
-    const a = data.address ?? {}
-    return a.suburb ?? a.neighbourhood ?? a.city_district ?? a.village ?? a.town ?? a.city ?? ''
-  } catch {
-    return ''
-  }
 }
 
 export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverageAreas }: Props) {
   const [selected, setSelected] = useState(selectedId)
   const [search, setSearch] = useState('')
-  const [locating, setLocating] = useState(false)
-  const [locError, setLocError] = useState('')
-  const [gpsSuggestedId, setGpsSuggestedId] = useState<string | null>(null)
-  // Store raw GPS fix coords so the delivery pin uses the actual location, not area centroid
-  const [gpsLat, setGpsLat] = useState<number | null>(null)
-  const [gpsLng, setGpsLng] = useState<number | null>(null)
+  const [showMap, setShowMap] = useState(false)
   const [waitlistArea, setWaitlistArea] = useState<string | null>(null)
   const [waitlistAreaName, setWaitlistAreaName] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistSent, setWaitlistSent] = useState(false)
   const [waitlistSaving, setWaitlistSaving] = useState(false)
-  const [showMap, setShowMap] = useState(false)
   const waitlistRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
-  // Only show areas that are active and have coordinates
+  // Only show areas that are active
   const activeAreas = areas.filter(a => a.is_active !== false)
 
   const normalizedSearch = normalizeText(search)
@@ -120,56 +89,6 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
     })
   }
 
-  function detectLocation() {
-    if (!navigator.geolocation) { setLocError('Location not supported on this device'); return }
-    setLocating(true)
-    setLocError('')
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        // Store raw GPS fix — used as the delivery pin in handleContinue
-        setGpsLat(lat)
-        setGpsLng(lng)
-
-        let nearest: Area | null = null
-        let nearestDist = Infinity
-        for (const a of activeAreas) {
-          if (a.lat == null || a.lng == null) continue
-          const dist = haversineKm(lat, lng, a.lat, a.lng)
-          if (dist < nearestDist) { nearestDist = dist; nearest = a }
-        }
-
-        if (!nearest || nearestDist > 2) {
-          const detected = await reverseGeocode(lat, lng)
-          setLocating(false)
-          openWaitlist(detected)
-          setLocError(
-            detected
-              ? `We don't deliver to ${detected} yet. Join the waitlist and we'll notify you.`
-              : "We don't deliver to your area yet. Tell us where you are."
-          )
-        } else if (nearest.status === 'active') {
-          setLocating(false)
-          setGpsSuggestedId(nearest.id)
-          setSelected(nearest.id)
-        } else {
-          setLocating(false)
-          openWaitlist(areaDisplayName(nearest))
-          setLocError(`We don't deliver to ${areaDisplayName(nearest)} yet — join the waitlist below.`)
-        }
-      },
-      err => {
-        setLocating(false)
-        setLocError(
-          err.code === 1
-            ? 'Location access denied. Select your area below.'
-            : 'Could not get location. Select your area below.'
-        )
-      },
-      { timeout: 8000 }
-    )
-  }
-
   function openWaitlist(prefilledName?: string) {
     setWaitlistArea(prefilledName ?? '')
     setWaitlistAreaName(prefilledName ?? '')
@@ -193,23 +112,11 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
   function handleContinue() {
     const area = activeAreas.find(a => a.id === selected && a.status === 'active')
     if (!area || area.lat == null || area.lng == null) return
-    const wasGpsSuggested = !!gpsSuggestedId
-    if (gpsSuggestedId) {
-      supabase.from('location_detection_log').insert({
-        area_id_suggested: gpsSuggestedId,
-        area_id_chosen: selected,
-      }).then(() => {})
-      setGpsSuggestedId(null)
-    }
-    // If this was GPS-suggested, use the raw GPS coordinates as the pin (not area centroid)
-    // so the rider navigates to the customer's actual location
-    const pinLat = (wasGpsSuggested && gpsLat != null) ? gpsLat : area.lat
-    const pinLng = (wasGpsSuggested && gpsLng != null) ? gpsLng : area.lng
-    onSave(area.id, areaDisplayName(area), pinLat, pinLng)
+    onSave(area.id, areaDisplayName(area), area.lat, area.lng)
   }
 
   function handleMapConfirm(lat: number, lng: number) {
-    onSave(null, 'Custom location', lat, lng)
+    onSave(null, 'My location', lat, lng)
   }
 
   const selectedArea = activeAreas.find(a => a.id === selected && a.status === 'active')
@@ -252,33 +159,24 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
           )}
         </div>
 
-        {/* Action row */}
+        {/* Action row: Use my location (auto-GPS via MapPicker) */}
         <div className="px-4 pb-3 shrink-0 flex gap-2">
           <button
             type="button"
-            onClick={detectLocation}
-            disabled={locating}
-            className="flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-2xl border border-brand bg-brand-tint text-brand font-semibold text-[14px] disabled:opacity-60"
-          >
-            {locating ? (
-              <span className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
-            ) : (
-              <Navigation size={16} />
-            )}
-            {locating ? 'Detecting…' : 'Use location'}
-          </button>
-
-          <button
-            type="button"
             onClick={() => setShowMap(true)}
-            className="flex items-center justify-center gap-2 h-11 px-4 rounded-2xl border border-line bg-surface text-ink font-semibold text-[14px]"
+            className="flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-2xl border border-brand bg-brand-tint text-brand font-semibold text-[14px]"
           >
-            <Map size={16} />
-            Pick on map
+            <Navigation size={16} />
+            Use my location
           </button>
         </div>
 
-        {locError && <p className="text-xs text-danger mx-4 mb-2 px-1">{locError}</p>}
+        {/* Divider */}
+        <div className="flex items-center gap-3 px-4 pb-3 shrink-0">
+          <div className="flex-1 h-px bg-line" />
+          <span className="text-[12px] text-ink-2 font-medium">or pick from the list</span>
+          <div className="flex-1 h-px bg-line" />
+        </div>
 
         {/* Search */}
         <div className="px-4 pb-3 shrink-0">
@@ -368,7 +266,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
           ))}
 
           <p className="text-[13px] text-ink-2 text-center px-2 py-3">
-            Not sure? Pick the place closest to you — your rider will call if needed.
+            Not sure? Use your location above — we&apos;ll detect it automatically.
           </p>
 
           {/* Waitlist */}
@@ -423,12 +321,14 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
           </div>
         </div>
 
-        {/* Continue button */}
-        <div className="px-4 pt-3 pb-3 border-t border-line shrink-0">
-          <Button onClick={handleContinue} disabled={!canContinue} fullWidth size="lg">
-            Continue
-          </Button>
-        </div>
+        {/* Continue button (only when area selected from list) */}
+        {canContinue && (
+          <div className="px-4 pt-3 pb-3 border-t border-line shrink-0">
+            <Button onClick={handleContinue} fullWidth size="lg">
+              Continue with {selectedArea ? areaDisplayName(selectedArea) : ''}
+            </Button>
+          </div>
+        )}
       </div>
     </>
   )

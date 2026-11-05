@@ -28,6 +28,9 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
   })
   const [locating, setLocating] = useState(false)
   const [outsideCoverage, setOutsideCoverage] = useState(false)
+  // Auto-locate on open when no initial position is given
+  const [autoLocating, setAutoLocating] = useState(initialLat == null)
+  const [autoLocateError, setAutoLocateError] = useState('')
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -54,10 +57,27 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
       map.on('move', () => {
         const { lat, lng } = map.getCenter()
         setCenter({ lat, lng })
-        setOutsideCoverage(false) // clear error when map moves
+        setOutsideCoverage(false)
       })
 
       mapRef.current = map
+
+      // Auto-detect GPS when no initial position is given
+      if (initialLat == null && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            if (!mounted) return
+            map.setView([pos.coords.latitude, pos.coords.longitude], 17)
+            setAutoLocating(false)
+          },
+          () => {
+            if (!mounted) return
+            setAutoLocating(false)
+            setAutoLocateError("Couldn't get your location — move the map to your spot")
+          },
+          { timeout: 10000, enableHighAccuracy: true }
+        )
+      }
     }
 
     initMap()
@@ -75,13 +95,14 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
   function locateMe() {
     if (!navigator.geolocation || !mapRef.current) return
     setLocating(true)
+    setAutoLocateError('')
     navigator.geolocation.getCurrentPosition(
       pos => {
         mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 17)
         setLocating(false)
       },
       () => setLocating(false),
-      { timeout: 8000 }
+      { timeout: 8000, enableHighAccuracy: true }
     )
   }
 
@@ -97,35 +118,43 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
         >
           <X size={16} />
         </button>
-        <span className="font-heading font-bold text-[16px]">Pin your delivery spot</span>
+        <span className="font-heading font-bold text-[16px]">Confirm your delivery spot</span>
       </div>
 
       {/* Map area */}
       <div className="relative flex-1">
         <div ref={containerRef} className="absolute inset-0" />
 
-        {/* Fixed centre pin overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none flex items-center justify-center"
-          style={{ paddingBottom: '0px' }}
-        >
+        {/* Auto-locating overlay */}
+        {autoLocating && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90">
+            <span className="w-8 h-8 rounded-full border-[3px] border-brand/20 border-t-brand animate-spin mb-3" />
+            <p className="text-[15px] font-semibold text-ink">Finding your location…</p>
+            <p className="text-[13px] text-ink-2 mt-1">Allow location access when prompted</p>
+          </div>
+        )}
+
+        {/* Fixed centre pin */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
           <div className="-translate-y-5">
             <MapPin size={40} fill="#0B7A47" stroke="white" strokeWidth={1.5} />
           </div>
         </div>
 
-        {/* Locate-me button */}
-        <button
-          type="button"
-          onClick={locateMe}
-          disabled={locating}
-          className="absolute top-3 right-3 w-11 h-11 rounded-full bg-white shadow-md flex items-center justify-center border border-line disabled:opacity-60"
-          aria-label="Use my location"
-        >
-          {locating
-            ? <span className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
-            : <Navigation size={18} stroke="#0B7A47" />}
-        </button>
+        {/* Re-locate button */}
+        {!autoLocating && (
+          <button
+            type="button"
+            onClick={locateMe}
+            disabled={locating}
+            className="absolute top-3 right-3 w-11 h-11 rounded-full bg-white shadow-md flex items-center justify-center border border-line disabled:opacity-60"
+            aria-label="Re-centre on my location"
+          >
+            {locating
+              ? <span className="w-4 h-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
+              : <Navigation size={18} stroke="#0B7A47" />}
+          </button>
+        )}
       </div>
 
       {/* Footer */}
@@ -133,15 +162,19 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
         className="px-4 pt-3 pb-5 border-t border-line shrink-0"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
-        <p className="text-[13px] text-ink-2 text-center mb-3">
-          Move the map so the pin is on your delivery spot
-        </p>
+        {autoLocateError ? (
+          <p className="text-[13px] text-ink-2 text-center mb-3 leading-snug">{autoLocateError}</p>
+        ) : (
+          <p className="text-[13px] text-ink-2 text-center mb-3">
+            Is the pin on your exact spot? Adjust the map if needed, then confirm.
+          </p>
+        )}
         {outsideCoverage && (
           <p className="text-[13px] text-warn text-center mb-3 leading-snug">
             This spot is outside our delivery area. Move the pin to a covered part of Sagamu.
           </p>
         )}
-        <Button fullWidth size="lg" onClick={() => {
+        <Button fullWidth size="lg" disabled={autoLocating} onClick={() => {
           if (coverageAreas && coverageAreas.length > 0) {
             const inside = isInsideCoverage(center.lat, center.lng, coverageAreas)
             if (!inside) { setOutsideCoverage(true); return }
