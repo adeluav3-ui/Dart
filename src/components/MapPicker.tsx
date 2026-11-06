@@ -20,20 +20,18 @@ const DEFAULT_LAT = 6.7073
 const DEFAULT_LNG = 3.8858
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+  if (!token) return ''
   try {
+    // Mapbox expects longitude first
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}&zoom=17&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng.toFixed(6)},${lat.toFixed(6)}.json?access_token=${token}&types=address,poi,neighborhood,locality&language=en&country=NG&limit=1`
     )
     if (!res.ok) return ''
     const data = await res.json()
-    const a = data.address ?? {}
-    const parts = [
-      a.road || a.pedestrian || a.path || a.footway,
-      a.suburb || a.neighbourhood || a.quarter || a.city_district,
-      a.city || a.town || a.village || a.county,
-    ].filter(Boolean)
-    return parts.join(', ') || data.display_name?.split(',').slice(0, 2).join(',').trim() || ''
+    const name: string = data.features?.[0]?.place_name ?? ''
+    // Strip ", Nigeria" suffix — redundant in a Nigeria-only app
+    return name.replace(/,\s*Nigeria$/, '').trim()
   } catch {
     return ''
   }
