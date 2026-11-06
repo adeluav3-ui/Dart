@@ -2,7 +2,7 @@
 
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState } from 'react'
-import { X, Navigation, MapPin } from 'lucide-react'
+import { X, Navigation } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { isInsideCoverage } from '@/lib/coverage'
 import type { CoverageArea } from '@/types/database'
@@ -176,16 +176,29 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
           </div>
         )}
 
-        {/* Fixed centre pin */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          {/* Shadow dot at pin tip (map centre) */}
-          <div className="absolute top-1/2 left-1/2 w-4 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/20 blur-[2px]" />
-          {/* Pin — shifted up so its tip sits at map centre */}
-          <div
-            className="-translate-y-5"
-            style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.35))' }}
-          >
-            <MapPin size={44} fill="#0B7A47" stroke="white" strokeWidth={1.5} />
+        {/* Fixed centre pin — z-index above all Leaflet panes (~700 max) */}
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1000 }}>
+          {/* Shadow oval at pin tip (map centre) */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 22, height: 11,
+            borderRadius: 9999,
+            background: 'rgba(0,0,0,0.22)',
+            filter: 'blur(3px)',
+          }} />
+          {/* Pin — translate(-50%, -100%) puts the pointed tip exactly at top:50% left:50% */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -100%)',
+            filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.4))',
+          }}>
+            <svg width="36" height="50" viewBox="0 0 36 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Teardrop body */}
+              <path d="M18 0C8.059 0 0 8.059 0 18C0 30 18 50 18 50C18 50 36 30 36 18C36 8.059 27.941 0 18 0Z" fill="#0B7A47"/>
+              {/* White inner circle */}
+              <circle cx="18" cy="18" r="7" fill="white"/>
+            </svg>
           </div>
         </div>
 
