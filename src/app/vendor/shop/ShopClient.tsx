@@ -74,6 +74,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
   // Shop location pin
   const [vendorLat, setVendorLat] = useState(vendor.lat)
   const [vendorLng, setVendorLng] = useState(vendor.lng)
+  const [locationLabel, setLocationLabel] = useState<string | null>(null)
   const [showLocationMap, setShowLocationMap] = useState(false)
   const [savingLocation, setSavingLocation] = useState(false)
   const [locationSaved, setLocationSaved] = useState(false)
@@ -194,11 +195,12 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
     }
   }
 
-  async function saveLocation(lat: number, lng: number) {
+  async function saveLocation(lat: number, lng: number, address: string) {
     setSavingLocation(true)
     await supabase.from('vendors').update({ lat, lng }).eq('id', vendor.id)
     setVendorLat(lat)
     setVendorLng(lng)
+    setLocationLabel(address || null)
     setSavingLocation(false)
     setLocationSaved(true)
     setShowLocationMap(false)
@@ -459,7 +461,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
           </div>
           {vendorLat != null ? (
             <p className="text-[13px] text-ink-2">
-              {vendorLat.toFixed(5)}, {vendorLng?.toFixed(5)}
+              {locationLabel || `${vendorLat.toFixed(5)}, ${vendorLng?.toFixed(5)}`}
             </p>
           ) : (
             <p className="text-[13px] text-danger font-medium">

@@ -115,8 +115,8 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
     onSave(area.id, areaDisplayName(area), area.lat, area.lng)
   }
 
-  function handleMapConfirm(lat: number, lng: number) {
-    onSave(null, 'My location', lat, lng)
+  function handleMapConfirm(lat: number, lng: number, address: string) {
+    onSave(null, address || 'My location', lat, lng)
   }
 
   const selectedArea = activeAreas.find(a => a.id === selected && a.status === 'active')
