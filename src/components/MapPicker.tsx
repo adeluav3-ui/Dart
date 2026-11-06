@@ -19,24 +19,6 @@ interface Props {
 const DEFAULT_LAT = 6.7073
 const DEFAULT_LNG = 3.8858
 
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-  if (!token) return ''
-  try {
-    // Mapbox expects longitude first
-    const res = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng.toFixed(6)},${lat.toFixed(6)}.json?access_token=${token}&types=address,poi,neighborhood,locality&language=en&country=NG&limit=1`
-    )
-    if (!res.ok) return ''
-    const data = await res.json()
-    const name: string = data.features?.[0]?.place_name ?? ''
-    // Strip ", Nigeria" suffix — redundant in a Nigeria-only app
-    return name.replace(/,\s*Nigeria$/, '').trim()
-  } catch {
-    return ''
-  }
-}
-
 export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverageAreas }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
@@ -45,19 +27,10 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
     lat: initialLat ?? DEFAULT_LAT,
     lng: initialLng ?? DEFAULT_LNG,
   })
-  const [locationName, setLocationName] = useState('')
-  const [loadingAddress, setLoadingAddress] = useState(false)
   const [locating, setLocating] = useState(false)
   const [outsideCoverage, setOutsideCoverage] = useState(false)
   const [autoLocating, setAutoLocating] = useState(initialLat == null)
   const [autoLocateError, setAutoLocateError] = useState('')
-
-  async function fetchAddress(lat: number, lng: number) {
-    setLoadingAddress(true)
-    const name = await reverseGeocode(lat, lng)
-    setLocationName(name)
-    setLoadingAddress(false)
-  }
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -86,13 +59,6 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
         setOutsideCoverage(false)
       })
 
-      // Reverse geocode after map stops moving
-      map.on('moveend', () => {
-        if (!mounted) return
-        const { lat, lng } = map.getCenter()
-        fetchAddress(lat, lng)
-      })
-
       mapRef.current = map
 
       if (initialLat == null) {
@@ -100,25 +66,19 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
           navigator.geolocation.getCurrentPosition(
             pos => {
               if (!mounted) return
-              // setView triggers moveend which fires fetchAddress
               map.setView([pos.coords.latitude, pos.coords.longitude], 17)
               setAutoLocating(false)
             },
             () => {
               if (!mounted) return
               setAutoLocating(false)
-              setAutoLocateError("Couldn't get your location — move the map to your spot")
-              fetchAddress(DEFAULT_LAT, DEFAULT_LNG)
+              setAutoLocateError("Couldn't detect your location — drag the map to your spot")
             },
             { timeout: 10000, enableHighAccuracy: true }
           )
         } else {
           setAutoLocating(false)
-          fetchAddress(DEFAULT_LAT, DEFAULT_LNG)
         }
-      } else {
-        // Known initial position: map doesn't move so moveend won't fire
-        fetchAddress(initialLat, initialLng!)
       }
     }
 
@@ -178,7 +138,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
 
         {/* Fixed centre pin — z-index above all Leaflet panes (~700 max) */}
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1000 }}>
-          {/* Shadow oval at pin tip (map centre) */}
+          {/* Shadow oval at pin tip */}
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -187,16 +147,14 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
             background: 'rgba(0,0,0,0.22)',
             filter: 'blur(3px)',
           }} />
-          {/* Pin — translate(-50%, -100%) puts the pointed tip exactly at top:50% left:50% */}
+          {/* Teardrop pin — tip lands exactly at map centre */}
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -100%)',
             filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.4))',
           }}>
             <svg width="36" height="50" viewBox="0 0 36 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Teardrop body */}
               <path d="M18 0C8.059 0 0 8.059 0 18C0 30 18 50 18 50C18 50 36 30 36 18C36 8.059 27.941 0 18 0Z" fill="#0B7A47"/>
-              {/* White inner circle */}
               <circle cx="18" cy="18" r="7" fill="white"/>
             </svg>
           </div>
@@ -223,24 +181,11 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
         className="px-4 pt-3 pb-5 border-t border-line shrink-0"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
-        {/* Address display */}
-        <div className="mb-3 min-h-[40px] flex flex-col justify-center">
-          {loadingAddress ? (
-            <div className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 rounded-full border-2 border-brand/30 border-t-brand animate-spin shrink-0" />
-              <span className="text-[13px] text-ink-2">Getting address…</span>
-            </div>
-          ) : locationName ? (
-            <>
-              <p className="text-[14px] font-semibold text-ink leading-snug">{locationName}</p>
-              <p className="text-[12px] text-ink-2 mt-0.5">Move the map to adjust</p>
-            </>
-          ) : (
-            <p className="text-[13px] text-ink-2">
-              {autoLocateError || 'Move the map to your exact spot, then confirm.'}
-            </p>
-          )}
-        </div>
+        <p className="text-[13px] text-ink-2 text-center mb-3 leading-snug">
+          {autoLocateError
+            ? autoLocateError
+            : 'Is the pin on your exact spot? Drag the map to adjust, then confirm.'}
+        </p>
 
         {outsideCoverage && (
           <p className="text-[13px] text-warn text-center mb-3 leading-snug">
@@ -253,9 +198,9 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
             const inside = isInsideCoverage(center.lat, center.lng, coverageAreas)
             if (!inside) { setOutsideCoverage(true); return }
           }
-          onConfirm(center.lat, center.lng, locationName)
+          onConfirm(center.lat, center.lng, '')
         }}>
-          Deliver here
+          Confirm spot
         </Button>
       </div>
     </div>
