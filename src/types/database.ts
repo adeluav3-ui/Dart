@@ -144,6 +144,7 @@ export interface Area {
   aliases: string[]
   lat: number | null
   lng: number | null
+  radius_m: number
   accuracy_m: number | null
   pin_saved_at: string | null
   pin_saved_by: string | null
@@ -151,6 +152,21 @@ export interface Area {
   status: AreaStatus
   is_active: boolean
   sort_order: number
+  created_at: string
+}
+
+export type DeliverySpotLabel = 'Home' | 'Hostel' | 'Work' | 'Other'
+
+export interface DeliverySpot {
+  id: string
+  user_id: string
+  label: DeliverySpotLabel
+  custom_label: string | null
+  lat: number
+  lng: number
+  area_id: string | null
+  description: string | null
+  is_default: boolean
   created_at: string
 }
 

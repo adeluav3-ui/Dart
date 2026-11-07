@@ -26,6 +26,8 @@ interface Order {
   ready_at: string | null
   customer_id: string
   vendor_id: string
+  pin_lat: number | null
+  pin_lng: number | null
 }
 
 interface OrderItem { name_snapshot: string; qty: number; line_total: number }
@@ -246,7 +248,9 @@ export function RiderJobClient({
   const noShowMinsLeft = Math.floor(noShowSecsLeft / 60)
   const noShowSecsDisplay = String(noShowSecsLeft % 60).padStart(2, '0')
 
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(customerArea + ', Sagamu, Ogun State')}`
+  const mapsUrl = order.pin_lat != null && order.pin_lng != null
+    ? `https://maps.google.com/?q=${order.pin_lat},${order.pin_lng}`
+    : `https://maps.google.com/?q=${encodeURIComponent(customerArea + ', Sagamu, Ogun State')}`
   const vendorMapsUrl = vendorAreaName
     ? `https://maps.google.com/?q=${encodeURIComponent(vendorAreaName + ', Sagamu, Ogun State')}`
     : null
@@ -523,7 +527,7 @@ export function RiderJobClient({
               </a>
               <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
                 className="flex-1 h-10 rounded-xl bg-surface border border-line text-[13px] font-bold text-ink flex items-center justify-center gap-1.5 no-underline">
-                <Map size={14} /> Open in Maps
+                <Map size={14} /> Navigate
               </a>
             </div>
           </div>

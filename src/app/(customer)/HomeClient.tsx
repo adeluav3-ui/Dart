@@ -10,15 +10,15 @@ import { AreaPicker } from '@/components/AreaPicker'
 import { formatMoney, areaDisplayName } from '@/lib/format'
 import { useCart, cartItemCount, cartSubtotal } from '@/store/cart'
 import { estimateDeliveryDistance, calcDeliveryPrice } from '@/lib/pricing/delivery'
-import { isInsideCoverage } from '@/lib/coverage'
-import { OutOfCoveragePanel } from '@/components/OutOfCoveragePanel'
-import type { Vendor, Zone, Area, VendorType, DeliveryPricingSettings, CoverageArea } from '@/types/database'
+import { findCoveringArea } from '@/lib/coverageCircles'
+import type { Vendor, Zone, Area, VendorType, DeliveryPricingSettings } from '@/types/database'
 
 interface DeliveryPin {
   areaId: string | null
   areaName: string
   lat: number
   lng: number
+  description?: string
 }
 
 const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
@@ -37,16 +37,14 @@ interface Props {
   zones: Zone[]
   areas: Area[]
   pricingSettings: DeliveryPricingSettings | null
-  coverageAreas: CoverageArea[]
+  coverageAreas?: unknown[]
 }
 
-export function HomeClient({ userId, vendors, zones, areas, pricingSettings, coverageAreas }: Props) {
+export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: Props) {
   const [storeType, setStoreType] = useState<VendorType | 'all'>('restaurant')
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [pin, setPin] = useState<DeliveryPin | null>(null)
-  const [pinOutsideCoverage, setPinOutsideCoverage] = useState(false)
-  const [showOutOfCoverage, setShowOutOfCoverage] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const { cart } = useCart()
   const itemCount = cart ? cartItemCount(cart) : 0
@@ -57,17 +55,11 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as DeliveryPin
-        // Validate that if areaId is set, it still exists and is active
         if (parsed.areaId) {
           const area = areas.find(a => a.id === parsed.areaId && a.is_active !== false && a.status === 'active')
-          if (!area) {
-            setPin({ ...parsed, areaId: null })
-            checkCoverage(parsed.lat, parsed.lng)
-            return
-          }
+          if (!area) { setPin({ ...parsed, areaId: null }); return }
         }
         setPin(parsed)
-        checkCoverage(parsed.lat, parsed.lng)
         return
       } catch {}
     }
@@ -78,30 +70,11 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areas, userId])
 
-  function checkCoverage(lat: number, lng: number) {
-    if (coverageAreas.length === 0) {
-      setPinOutsideCoverage(false)
-      return
-    }
-    const inside = isInsideCoverage(lat, lng, coverageAreas)
-    setPinOutsideCoverage(!inside)
-  }
-
-  function savePin(areaId: string | null, areaName: string, lat: number, lng: number) {
-    const newPin: DeliveryPin = { areaId, areaName, lat, lng }
+  function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description?: string) {
+    const newPin: DeliveryPin = { areaId, areaName, lat, lng, description }
     setPin(newPin)
     localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
-    if (coverageAreas.length > 0) {
-      const inside = isInsideCoverage(lat, lng, coverageAreas)
-      if (!inside) {
-        setPinOutsideCoverage(true)
-        setShowOutOfCoverage(true)
-        return
-      }
-    }
-    setPinOutsideCoverage(false)
-    setShowOutOfCoverage(false)
   }
 
   const maxDistanceM = pricingSettings?.max_distance_m ?? 6000
@@ -120,6 +93,8 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
 
   const filtered = useMemo(() => {
     return vendors.filter(v => {
+      // Never show vendors without a shop pin
+      if (v.lat == null || v.lng == null) return false
       if (storeType !== 'all' && v.type !== storeType) return false
       if (search && !v.name.toLowerCase().includes(search.toLowerCase()) &&
           !v.category?.toLowerCase().includes(search.toLowerCase())) return false
@@ -130,7 +105,7 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
         if (!inVendorCategory && !inMenuCategories) return false
       }
       // Hide vendors where the straight-line estimate is already over max_distance_m
-      if (pin && v.lat != null && v.lng != null) {
+      if (pin) {
         const distM = estimateDeliveryDistance(v.lat, v.lng, pin.lat, pin.lng)
         if (distM > maxDistanceM) return false
       }
@@ -142,26 +117,7 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
   const closed = filtered.filter(v => !v.is_open)
 
   const displayName = pin?.areaName ?? 'Select area'
-
-  if (showOutOfCoverage && pin) {
-    return (
-      <div className="min-h-screen flex flex-col font-body text-ink">
-        {/* Top bar */}
-        <div
-          className="flex items-center justify-between px-4 pt-4 pb-1"
-          style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
-        >
-          <Logo height={28} />
-        </div>
-        <OutOfCoveragePanel
-          lat={pin.lat}
-          lng={pin.lng}
-          userId={userId}
-          onChangeSpot={() => { setShowOutOfCoverage(false); setPickerOpen(true) }}
-        />
-      </div>
-    )
-  }
+  const pinOutsideCoverage = pin ? !findCoveringArea(pin.lat, pin.lng, areas) : false
 
   return (
     <>
@@ -205,10 +161,10 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
           </button>
 
           {/* Outside coverage banner */}
-          {pinOutsideCoverage && pin && (
+          {pinOutsideCoverage && (
             <button
               type="button"
-              onClick={() => setShowOutOfCoverage(true)}
+              onClick={() => setPickerOpen(true)}
               className="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-warn-tint text-warn text-[13px] font-semibold text-left"
             >
               <span className="flex-1">We don&apos;t deliver to your spot yet.</span>
@@ -307,7 +263,9 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
           )}
 
           {filtered.length === 0 && (
-            <p className="text-center text-ink-2 py-10 text-sm">No vendors found</p>
+            <p className="text-center text-ink-2 py-10 text-sm">
+              {pin ? 'No vendors in your area yet' : 'Set your delivery spot to see vendors'}
+            </p>
           )}
         </div>
 
@@ -343,7 +301,7 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings, cov
           selectedId={pin?.areaId ?? ''}
           onSave={savePin}
           onClose={pin ? () => setPickerOpen(false) : undefined}
-          coverageAreas={coverageAreas}
+          userId={userId}
         />
       )}
     </>

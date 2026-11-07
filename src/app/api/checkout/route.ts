@@ -4,8 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { parseServiceFeeSettings, calcServiceFee } from '@/lib/serviceFee'
 import { getRoadDistance } from '@/lib/server/getRoadDistance'
 import { calcDeliveryPrice, type DeliveryPricingSettings } from '@/lib/pricing/delivery'
-import { isInsideCoverage } from '@/lib/coverage'
-import type { Cart, CartItem, CoverageArea } from '@/types/database'
+import { findCoveringArea } from '@/lib/coverageCircles'
+import type { Cart, CartItem, Area } from '@/types/database'
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (pinLat == null || pinLng == null) {
-      return NextResponse.json({ error: 'Delivery pin required' }, { status: 400 })
+      return NextResponse.json({ error: 'Delivery pin required', code: 'PIN_MISSING' }, { status: 400 })
     }
 
     // 1. Load customer area (optional — only for gate pickup and zone recording)
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (vendor.lat == null || vendor.lng == null) {
-      return NextResponse.json({ error: 'Vendor location not configured — cannot accept orders yet' }, { status: 400 })
+      return NextResponse.json({ error: 'Vendor location not configured — cannot accept orders yet', code: 'VENDOR_LOCATION_MISSING' }, { status: 400 })
     }
 
     // 3. Recompute prices from DB
@@ -149,22 +149,22 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4. Load service fee, delivery pricing settings, and coverage areas
-    const [{ data: feeRows }, { data: pricingSettings }, { data: coverageRows }] = await Promise.all([
+    // 4. Load service fee, delivery pricing settings, and active areas for coverage check
+    const [{ data: feeRows }, { data: pricingSettings }, { data: areaRows }] = await Promise.all([
       admin.from('app_settings').select('key, value').in('key', [
         'service_fee_enabled', 'service_fee_type', 'service_fee_percent',
         'service_fee_min', 'service_fee_max', 'service_fee_flat',
       ]),
       admin.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
-      admin.from('coverage_areas').select('*').eq('is_active', true),
+      admin.from('areas').select('*').eq('is_active', true).eq('status', 'active'),
     ])
 
-    // Coverage check — skip if no active areas defined
-    const coverageAreas = (coverageRows ?? []) as CoverageArea[]
-    if (coverageAreas.length > 0) {
-      const inside = isInsideCoverage(pinLat, pinLng, coverageAreas)
-      if (!inside) {
-        return NextResponse.json({ error: 'Delivery spot is outside our coverage area' }, { status: 400 })
+    // Coverage check using circle-based areas
+    const areas = (areaRows ?? []) as Area[]
+    if (areas.length > 0) {
+      const covering = findCoveringArea(pinLat, pinLng, areas)
+      if (!covering) {
+        return NextResponse.json({ error: 'Delivery spot is outside our coverage area', code: 'OUTSIDE_COVERAGE' }, { status: 400 })
       }
     }
 

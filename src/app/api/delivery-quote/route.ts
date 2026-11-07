@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRoadDistance } from '@/lib/server/getRoadDistance'
 import { calcDeliveryPrice, type DeliveryPricingSettings } from '@/lib/pricing/delivery'
-import { isInsideCoverage } from '@/lib/coverage'
-import type { CoverageArea } from '@/types/database'
+import { findCoveringArea } from '@/lib/coverageCircles'
+import type { Area } from '@/types/database'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,23 +15,23 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    const [{ data: vendor }, { data: settings }, { data: coverageRows }] = await Promise.all([
+    const [{ data: vendor }, { data: settings }, { data: areaRows }] = await Promise.all([
       admin.from('vendors').select('lat, lng, name').eq('id', vendorId).single(),
       admin.from('delivery_pricing_settings').select('*').eq('id', 1).single(),
-      admin.from('coverage_areas').select('*').eq('is_active', true),
+      admin.from('areas').select('*').eq('is_active', true).eq('status', 'active'),
     ])
 
-    // Coverage check — skip if no active areas defined
-    const coverageAreas = (coverageRows ?? []) as CoverageArea[]
-    if (coverageAreas.length > 0) {
-      const inside = isInsideCoverage(pinLat, pinLng, coverageAreas)
-      if (!inside) {
+    // Coverage check using circle-based areas
+    const areas = (areaRows ?? []) as Area[]
+    if (areas.length > 0) {
+      const covering = findCoveringArea(pinLat, pinLng, areas)
+      if (!covering) {
         return NextResponse.json({ error: 'Delivery spot is outside our coverage area', code: 'OUTSIDE_COVERAGE' }, { status: 400 })
       }
     }
 
     if (!vendor?.lat || !vendor?.lng) {
-      return NextResponse.json({ error: 'Vendor location not set' }, { status: 400 })
+      return NextResponse.json({ error: 'Vendor location not set', code: 'VENDOR_LOCATION_MISSING' }, { status: 400 })
     }
 
     if (!settings) {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     )
 
     return NextResponse.json({
-      delivery_fee: okada_fare, // what the customer pays (shown in UI as "Delivery fee")
+      delivery_fee: okada_fare,
       okada_fare,
       rider_pay,
       platform_delivery_cost: delivery_fee,

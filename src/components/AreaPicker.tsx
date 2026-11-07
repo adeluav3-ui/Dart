@@ -14,16 +14,17 @@ interface Props {
   areas: Area[]
   zones: Zone[]
   selectedId: string
-  onSave: (areaId: string | null, areaName: string, lat: number, lng: number) => void
+  onSave: (areaId: string | null, areaName: string, lat: number, lng: number, description?: string) => void
   onClose?: () => void
   coverageAreas?: CoverageArea[]
+  userId?: string | null
 }
 
 function normalizeText(s: string) {
   return s.toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverageAreas }: Props) {
+export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverageAreas, userId }: Props) {
   const [selected, setSelected] = useState(selectedId)
   const [search, setSearch] = useState('')
   const [showMap, setShowMap] = useState(false)
@@ -115,8 +116,8 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
     onSave(area.id, areaDisplayName(area), area.lat, area.lng)
   }
 
-  function handleMapConfirm(lat: number, lng: number, address: string) {
-    onSave(null, address || 'My location', lat, lng)
+  function handleMapConfirm(lat: number, lng: number, address: string, description?: string) {
+    onSave(null, address || 'My location', lat, lng, description)
   }
 
   const selectedArea = activeAreas.find(a => a.id === selected && a.status === 'active')
@@ -134,8 +135,8 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
           initialLng={currentPin?.lng}
           onConfirm={handleMapConfirm}
           onClose={() => setShowMap(false)}
-          coverageAreas={coverageAreas}
           areas={areas}
+          userId={userId}
         />
       </Suspense>
     )

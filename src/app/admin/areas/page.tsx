@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import 'leaflet/dist/leaflet.css'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -15,10 +16,80 @@ type EditState = {
   aliases: string
   lat: string
   lng: string
+  radius_m: string
   status: 'active' | 'coming_soon'
 }
 
-const EMPTY_EDIT: EditState = { name: '', district: '', zone_id: '', aliases: '', lat: '', lng: '', status: 'active' }
+const EMPTY_EDIT: EditState = {
+  name: '', district: '', zone_id: '', aliases: '',
+  lat: '', lng: '', radius_m: '800', status: 'active',
+}
+
+// ── Leaflet map showing all area circles ────────────────────────────────────
+function AreasMap({ areas }: { areas: Area[] }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    let mounted = true
+
+    async function init() {
+      const L = (await import('leaflet')).default
+      if (!mounted || !containerRef.current) return
+
+      const pinned = areas.filter(a => a.lat != null && a.lng != null)
+      const firstPin = pinned[0]
+      const center: [number, number] = firstPin
+        ? [firstPin.lat!, firstPin.lng!]
+        : [6.7073, 3.8858]
+
+      const map = L.map(containerRef.current, { center, zoom: 13, zoomControl: true })
+
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+      const tileUrl = mapboxToken
+        ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+      L.tileLayer(tileUrl, { maxZoom: 22, tileSize: 512, zoomOffset: -1 }).addTo(map)
+
+      for (const area of pinned) {
+        const r = area.radius_m ?? 800
+        L.circle([area.lat!, area.lng!], {
+          radius: r,
+          color: '#0B7A47',
+          fillColor: '#0B7A47',
+          fillOpacity: 0.12,
+          weight: 2,
+        }).addTo(map).bindTooltip(area.name, { permanent: false })
+
+        L.circleMarker([area.lat!, area.lng!], {
+          radius: 5,
+          color: '#0B7A47',
+          fillColor: '#0B7A47',
+          fillOpacity: 1,
+          weight: 1,
+        }).addTo(map)
+      }
+
+      mapRef.current = map
+    }
+
+    init()
+    return () => {
+      mounted = false
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full rounded-2xl overflow-hidden border border-line"
+      style={{ height: 320 }}
+    />
+  )
+}
 
 export default function AdminAreasPage() {
   const [areas, setAreas] = useState<Area[]>([])
@@ -51,6 +122,7 @@ export default function AdminAreasPage() {
       aliases: area.aliases.join(', '),
       lat: area.lat != null ? String(area.lat) : '',
       lng: area.lng != null ? String(area.lng) : '',
+      radius_m: String(area.radius_m ?? 800),
       status: area.status,
     })
   }
@@ -92,6 +164,7 @@ export default function AdminAreasPage() {
       aliases: parseAliases(edit.aliases),
       lat: edit.lat ? parseFloat(edit.lat) : null,
       lng: edit.lng ? parseFloat(edit.lng) : null,
+      radius_m: edit.radius_m ? parseInt(edit.radius_m, 10) : 800,
       status: edit.status,
     }
 
@@ -109,12 +182,10 @@ export default function AdminAreasPage() {
 
   const zoneMap = Object.fromEntries(zones.map(z => [z.id, z]))
 
-  // All unique district values for the filter
   const allDistricts = Array.from(
     new Set(areas.map(a => a.district).filter((d): d is string => !!d))
   ).sort()
 
-  // Apply district filter then group by zone
   const visibleAreas = districtFilter === '__all__'
     ? areas
     : areas.filter(a => a.district === districtFilter)
@@ -131,6 +202,8 @@ export default function AdminAreasPage() {
     }
   }
 
+  const pinnedAreas = areas.filter(a => a.lat != null && a.lng != null)
+
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -146,6 +219,11 @@ export default function AdminAreasPage() {
           <Button onClick={startAdd} size="md">+ Add area</Button>
         </div>
       </div>
+
+      {/* Areas map */}
+      {pinnedAreas.length > 0 && (
+        <AreasMap areas={pinnedAreas} />
+      )}
 
       {/* Add / Edit form */}
       {editingId && (
@@ -185,7 +263,7 @@ export default function AdminAreasPage() {
             onChange={e => setEdit(p => ({ ...p, aliases: e.target.value }))}
           />
 
-          {/* Lat / lng + location button */}
+          {/* Lat / lng + radius + location button */}
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-ink-2">Centre point</span>
             <div className="grid grid-cols-2 gap-2">
@@ -205,6 +283,21 @@ export default function AdminAreasPage() {
                 onChange={e => setEdit(p => ({ ...p, lng: e.target.value }))}
                 className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink"
               />
+            </div>
+            <div className="flex gap-2 items-center">
+              <label className="flex flex-col gap-0.5 flex-1 text-xs font-semibold text-ink-2">
+                Coverage radius (metres)
+                <input
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="50"
+                  placeholder="800"
+                  value={edit.radius_m}
+                  onChange={e => setEdit(p => ({ ...p, radius_m: e.target.value }))}
+                  className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink"
+                />
+              </label>
             </div>
             <button
               type="button"
@@ -296,8 +389,10 @@ export default function AdminAreasPage() {
                   {area.aliases.length > 0 && (
                     <p className="text-xs text-ink-2 mt-0.5">{area.aliases.join(', ')}</p>
                   )}
-                  {(area.lat != null && area.lng != null) && (
-                    <p className="text-xs text-ink-2 mt-0.5">{area.lat.toFixed(4)}, {area.lng.toFixed(4)}</p>
+                  {area.lat != null && area.lng != null && (
+                    <p className="text-xs text-ink-2 mt-0.5">
+                      {area.lat.toFixed(4)}, {area.lng.toFixed(4)} · r={area.radius_m ?? 800}m
+                    </p>
                   )}
                 </div>
                 <button

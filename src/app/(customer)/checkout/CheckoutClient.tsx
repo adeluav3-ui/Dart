@@ -10,15 +10,15 @@ import { useCart, cartSubtotal } from '@/store/cart'
 import { calcServiceFee, type ServiceFeeSettings } from '@/lib/serviceFee'
 import { Button } from '@/components/ui/Button'
 import { AreaPicker } from '@/components/AreaPicker'
-import { OutOfCoveragePanel } from '@/components/OutOfCoveragePanel'
-import { isInsideCoverage } from '@/lib/coverage'
-import type { Zone, Area, CoverageArea } from '@/types/database'
+import { findCoveringArea } from '@/lib/coverageCircles'
+import type { Zone, Area } from '@/types/database'
 
 interface DeliveryPin {
   areaId: string | null
   areaName: string
   lat: number
   lng: number
+  description?: string
 }
 
 interface DeliveryQuote {
@@ -34,18 +34,17 @@ interface Props {
   zones: Zone[]
   areas: Area[]
   feeSettings: ServiceFeeSettings
-  coverageAreas: CoverageArea[]
+  coverageAreas?: unknown[]
 }
 
 const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
 
-export function CheckoutClient({ userId, zones, areas, feeSettings, coverageAreas }: Props) {
+export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
 
   const [pin, setPin] = useState<DeliveryPin | null>(null)
-  const [pinOutsideCoverage, setPinOutsideCoverage] = useState(false)
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
   const [phone, setPhone] = useState('')
@@ -58,18 +57,11 @@ export function CheckoutClient({ userId, zones, areas, feeSettings, coverageArea
   const [quoteLoading, setQuoteLoading] = useState(false)
   const submittingRef = useRef(false)
 
-  // Hydrate pin from localStorage and check coverage
+  // Hydrate pin from localStorage
   useEffect(() => {
     const raw = localStorage.getItem(deliveryKey(userId))
     if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as DeliveryPin
-        setPin(parsed)
-        if (coverageAreas.length > 0) {
-          const inside = isInsideCoverage(parsed.lat, parsed.lng, coverageAreas)
-          setPinOutsideCoverage(!inside)
-        }
-      } catch {}
+      try { setPin(JSON.parse(raw) as DeliveryPin) } catch {}
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
@@ -109,17 +101,11 @@ export function CheckoutClient({ userId, zones, areas, feeSettings, coverageArea
   const serviceFee = calcServiceFee(subtotal, feeSettings)
   const total = subtotal + deliveryFee + serviceFee
 
-  function savePin(areaId: string | null, areaName: string, lat: number, lng: number) {
-    const newPin: DeliveryPin = { areaId, areaName, lat, lng }
+  function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description?: string) {
+    const newPin: DeliveryPin = { areaId, areaName, lat, lng, description }
     setPin(newPin)
     localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
-    if (coverageAreas.length > 0) {
-      const inside = isInsideCoverage(lat, lng, coverageAreas)
-      setPinOutsideCoverage(!inside)
-    } else {
-      setPinOutsideCoverage(false)
-    }
   }
 
   async function placeOrder() {
@@ -322,24 +308,15 @@ export function CheckoutClient({ userId, zones, areas, feeSettings, coverageArea
           </span>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
-        {pinOutsideCoverage && pin ? (
-          <OutOfCoveragePanel
-            lat={pin.lat}
-            lng={pin.lng}
-            userId={userId}
-            onChangeSpot={() => setPickerOpen(true)}
-          />
-        ) : (
-          <Button
-            onClick={placeOrder}
-            loading={loading}
-            disabled={!pin || quote?.too_far === true}
-            fullWidth
-            size="lg"
-          >
-            Pay {formatMoney(total)}
-          </Button>
-        )}
+        <Button
+          onClick={placeOrder}
+          loading={loading}
+          disabled={!pin || quote?.too_far === true}
+          fullWidth
+          size="lg"
+        >
+          Pay {formatMoney(total)}
+        </Button>
         <p className="text-[12px] text-ink-2 text-center leading-relaxed">
           By paying you agree to the{' '}
           <Link href="/terms" className="text-brand underline-offset-2 hover:underline">Terms of Use</Link>
@@ -355,7 +332,7 @@ export function CheckoutClient({ userId, zones, areas, feeSettings, coverageArea
           selectedId={pin?.areaId ?? ''}
           onSave={savePin}
           onClose={() => setPickerOpen(false)}
-          coverageAreas={coverageAreas}
+          userId={userId}
         />
       )}
     </div>
