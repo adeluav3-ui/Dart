@@ -39,6 +39,7 @@ const NAV = [
       { href: '/admin/areas', label: 'Areas' },
       { href: '/admin/prices', label: 'Pricing' },
       { href: '/admin/users', label: 'Users' },
+      { href: '/admin/settings', label: 'Settings' },
     ],
   },
   {
