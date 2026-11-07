@@ -102,16 +102,19 @@ export async function POST(req: NextRequest) {
 
   // Daily cap
   if (await overDailyCap('places_search')) {
+    console.error('[places/search] daily cap reached')
     return NextResponse.json({ unavailable: true })
   }
 
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY
   if (!apiKey) {
+    console.error('[places/search] GOOGLE_MAPS_SERVER_KEY not set')
     return NextResponse.json({ unavailable: true })
   }
 
   const bbox = await getBbox()
   if (!bbox) {
+    console.error('[places/search] no active areas with coordinates — bbox is null')
     return NextResponse.json({ unavailable: true })
   }
 
@@ -143,6 +146,8 @@ export async function POST(req: NextRequest) {
     clearTimeout(timer)
 
     if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      console.error('[places/search] Google API error', res.status, errText)
       return NextResponse.json({ unavailable: true })
     }
 
@@ -167,7 +172,8 @@ export async function POST(req: NextRequest) {
     admin.from('google_call_log').insert({ type: 'places_search' }).then(() => {})
 
     return NextResponse.json({ results })
-  } catch {
+  } catch (err) {
+    console.error('[places/search] fetch threw', err)
     return NextResponse.json({ unavailable: true })
   }
 }
