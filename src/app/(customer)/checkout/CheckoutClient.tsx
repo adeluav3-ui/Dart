@@ -84,7 +84,14 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
       })
       .catch(() => setQuote(null))
       .finally(() => setQuoteLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin?.lat, pin?.lng, cart?.vendorId])
+
+  // Pre-fill landmark from saved pin description — must be before any early return
+  useEffect(() => {
+    if (pin?.description && !landmark) setLandmark(pin.description)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin?.description])
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -108,12 +115,6 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
     localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
   }
-
-  // Pre-fill landmark from saved pin description
-  useEffect(() => {
-    if (pin?.description && !landmark) setLandmark(pin.description)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin?.description])
 
   async function placeOrder() {
     if (submittingRef.current) return
