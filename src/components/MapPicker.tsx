@@ -2,7 +2,7 @@
 
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { X, Navigation, Search } from 'lucide-react'
+import { X, Navigation, Search, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { findCoveringArea } from '@/lib/coverageCircles'
 import { createClient } from '@/lib/supabase/client'
@@ -42,6 +42,10 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
   const mapRef = useRef<any>(null)
   const accuracyCircleRef = useRef<any>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reverseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Phase: 'pin' = map + search, 'describe' = write your own description
+  const [phase, setPhase] = useState<'pin' | 'describe'>('pin')
 
   const [center, setCenter] = useState({
     lat: initialLat ?? DEFAULT_LAT,
@@ -56,7 +60,16 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
   const [autoLocating, setAutoLocating] = useState(initialLat == null)
   const [autoLocateError, setAutoLocateError] = useState('')
 
-  // ── Search state ─────────────────────────────────────────────────────────
+  // Live place name shown while positioning the pin (never saved)
+  const [previewName, setPreviewName] = useState('')
+  const [reverseLoading, setReverseLoading] = useState(false)
+
+  // Set when user taps "Confirm spot" in phase 1
+  const [confirmedPos, setConfirmedPos] = useState<{
+    lat: number; lng: number; areaName: string; previewName: string
+  } | null>(null)
+
+  // ── Search state ──────────────────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState('')
   const [sessionToken, setSessionToken] = useState('')
   const [searchResults, setSearchResults] = useState<PlaceResult[] | null>(null)
@@ -64,7 +77,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
   const [searchUnavailable, setSearchUnavailable] = useState(false)
   const [searchHint, setSearchHint] = useState(false)
 
-  // ── Other state ──────────────────────────────────────────────────────────
+  // ── Other state ───────────────────────────────────────────────────────────
   const [showWaitlist, setShowWaitlist] = useState(false)
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistSaving, setWaitlistSaving] = useState(false)
@@ -73,7 +86,9 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
   const [savedSpots, setSavedSpots] = useState<DeliverySpot[]>([])
   const [showSavePrompt, setShowSavePrompt] = useState(false)
   const [savingSpot, setSavingSpot] = useState(false)
-  const [pendingConfirm, setPendingConfirm] = useState<{ lat: number; lng: number; areaName: string } | null>(null)
+
+  const descLen = description.trim().length
+  const descOk = descLen >= 10 && descLen <= 140
 
   const areasRef = useRef(areas)
   useEffect(() => { areasRef.current = areas }, [areas])
@@ -88,6 +103,20 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
       .order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setSavedSpots(data as DeliverySpot[]) })
   }, [userId])
+
+  // Reverse geocoding (debounced, fires on moveend)
+  const scheduleReverseGeocode = useCallback((lat: number, lng: number) => {
+    if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
+    reverseDebounceRef.current = setTimeout(async () => {
+      setReverseLoading(true)
+      try {
+        const res = await fetch(`/api/places/reverse?lat=${lat}&lng=${lng}`)
+        const data = await res.json()
+        if (data.name) setPreviewName(data.name)
+      } catch {}
+      finally { setReverseLoading(false) }
+    }, 600)
+  }, [])
 
   // Map init
   useEffect(() => {
@@ -129,6 +158,13 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
         }
       })
 
+      // Reverse geocode after each drag/pan ends
+      map.on('moveend', () => {
+        if (!mounted) return
+        const { lat, lng } = map.getCenter()
+        scheduleReverseGeocode(lat, lng)
+      })
+
       mapRef.current = map
 
       if (initialLat == null) {
@@ -144,17 +180,22 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
                 ).addTo(map)
               }
               setAutoLocating(false)
+              scheduleReverseGeocode(pos.coords.latitude, pos.coords.longitude)
             },
             () => {
               if (!mounted) return
               setAutoLocating(false)
               setAutoLocateError("Couldn't detect your location — drag the map to your spot")
+              scheduleReverseGeocode(DEFAULT_LAT, DEFAULT_LNG)
             },
             { timeout: 10000, enableHighAccuracy: true }
           )
         } else {
           setAutoLocating(false)
+          scheduleReverseGeocode(DEFAULT_LAT, DEFAULT_LNG)
         }
+      } else {
+        scheduleReverseGeocode(initialLat, initialLng!)
       }
     }
 
@@ -163,6 +204,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     return () => {
       mounted = false
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+      if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -195,7 +237,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     if (mapRef.current) mapRef.current.setView([spot.lat, spot.lng], 17)
   }
 
-  // ── Places search ─────────────────────────────────────────────────────────
+  // ── Places search ──────────────────────────────────────────────────────────
   function handleSearchFocus() {
     if (!sessionToken) setSessionToken(newToken())
   }
@@ -209,21 +251,16 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
         body: JSON.stringify({ input: value, sessionToken: token }),
       })
       if (res.status === 429) {
-        setSearchUnavailable(true)
-        setSearchResults(null)
-        return
+        setSearchUnavailable(true); setSearchResults(null); return
       }
       const data = await res.json()
       if (data.unavailable) {
-        setSearchUnavailable(true)
-        setSearchResults(null)
-        return
+        setSearchUnavailable(true); setSearchResults(null); return
       }
       setSearchUnavailable(false)
       setSearchResults((data.results ?? []) as PlaceResult[])
     } catch {
-      setSearchUnavailable(true)
-      setSearchResults(null)
+      setSearchUnavailable(true); setSearchResults(null)
     } finally {
       setSearchLoading(false)
     }
@@ -233,10 +270,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     setSearchInput(value)
     setSearchUnavailable(false)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (value.length < 3) {
-      setSearchResults(null)
-      return
-    }
+    if (value.length < 3) { setSearchResults(null); return }
     debounceRef.current = setTimeout(() => runSearch(value, sessionToken), 350)
   }
 
@@ -244,6 +278,8 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     setSearchInput('')
     setSearchResults(null)
     setSearchUnavailable(false)
+    // Show the place name the customer selected immediately (before reverse geocode)
+    setPreviewName(`${result.main}${result.secondary ? `, ${result.secondary}` : ''}`)
 
     try {
       const res = await fetch(
@@ -251,17 +287,11 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
       )
       const data = await res.json()
       if (data.unavailable || typeof data.lat !== 'number' || typeof data.lng !== 'number') return
-
       if (mapRef.current) mapRef.current.setView([data.lat, data.lng], 18)
-
-      // Show drag hint for 6 s
       setSearchHint(true)
       setTimeout(() => setSearchHint(false), 6000)
-    } catch {
-      // fail silently — map still usable
-    }
+    } catch {}
 
-    // Discard the session token so the next search starts a fresh billing session
     setSessionToken(newToken())
   }
 
@@ -272,57 +302,148 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     if (debounceRef.current) clearTimeout(debounceRef.current)
   }
 
-  // ── Waitlist + confirm ────────────────────────────────────────────────────
+  // ── Waitlist ───────────────────────────────────────────────────────────────
   async function submitWaitlist() {
     setWaitlistSaving(true)
     const supabase = createClient()
     await supabase.from('coverage_waitlist').insert({
       email: waitlistEmail.trim() || null,
-      lat: center.lat,
-      lng: center.lng,
-      user_id: userId ?? null,
+      lat: center.lat, lng: center.lng, user_id: userId ?? null,
     })
     setWaitlistSaving(false)
     setWaitlistSent(true)
   }
 
-  const descLen = description.trim().length
-  const descOk = descLen >= 10 && descLen <= 140
+  // ── Phase 1 → Phase 2 ─────────────────────────────────────────────────────
+  function handleConfirm() {
+    const covering = findCoveringArea(center.lat, center.lng, areas ?? [])
+    if (!covering) { setShowWaitlist(true); return }
+    setConfirmedPos({
+      lat: center.lat,
+      lng: center.lng,
+      areaName: covering.name,
+      previewName: previewName || covering.name,
+    })
+    setPhase('describe')
+  }
+
+  // ── Phase 2: save ──────────────────────────────────────────────────────────
+  function handleSave() {
+    if (!confirmedPos || !descOk) return
+    if (userId) { setShowSavePrompt(true); return }
+    onConfirm(confirmedPos.lat, confirmedPos.lng, confirmedPos.areaName, description.trim())
+  }
 
   async function saveSpotAndConfirm(label: DeliverySpotLabel) {
-    if (!pendingConfirm || !userId) return
+    if (!confirmedPos || !userId) return
     setSavingSpot(true)
     const supabase = createClient()
     await supabase.from('delivery_spots').insert({
       user_id: userId,
       label,
-      lat: pendingConfirm.lat,
-      lng: pendingConfirm.lng,
+      lat: confirmedPos.lat,
+      lng: confirmedPos.lng,
       area_id: coveringArea?.id ?? null,
       description: description.trim() || null,
       is_default: savedSpots.length === 0,
     })
     setSavingSpot(false)
     setShowSavePrompt(false)
-    onConfirm(pendingConfirm.lat, pendingConfirm.lng, pendingConfirm.areaName, description.trim(), label)
-  }
-
-  function handleConfirm() {
-    const covering = findCoveringArea(center.lat, center.lng, areas ?? [])
-    if (!covering) { setShowWaitlist(true); return }
-    if (!descOk) return
-    const areaName = covering.name
-    if (userId) {
-      setPendingConfirm({ lat: center.lat, lng: center.lng, areaName })
-      setShowSavePrompt(true)
-      return
-    }
-    onConfirm(center.lat, center.lng, areaName, description.trim())
+    onConfirm(confirmedPos.lat, confirmedPos.lng, confirmedPos.areaName, description.trim(), label)
   }
 
   const isOutside = !findCoveringArea(center.lat, center.lng, areas ?? [])
   const showResultsDropdown = searchInput.length >= 3 && (searchResults !== null || searchUnavailable)
 
+  // ── Phase 2: description screen ───────────────────────────────────────────
+  if (phase === 'describe') {
+    return (
+      <div className="fixed inset-0 z-[80] flex flex-col bg-white">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line shrink-0"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
+          <button type="button" onClick={() => setPhase('pin')}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-surface">
+            <ArrowLeft size={16} />
+          </button>
+          <span className="font-heading font-bold text-[16px]">Describe your spot</span>
+        </div>
+
+        <div className="flex-1 flex flex-col px-4 py-5 gap-4 overflow-y-auto">
+          {/* Confirmed location card */}
+          <div className="bg-brand-tint rounded-2xl px-4 py-3.5 flex flex-col gap-0.5">
+            <span className="text-[11px] font-bold text-brand-ink tracking-wide uppercase">Delivering to</span>
+            <span className="text-[16px] font-bold text-ink leading-snug">
+              {confirmedPos?.previewName || confirmedPos?.areaName}
+            </span>
+            {confirmedPos?.previewName && confirmedPos.previewName !== confirmedPos.areaName && (
+              <span className="text-[12px]" style={{ color: '#5B6168' }}>
+                Near {confirmedPos.areaName}
+              </span>
+            )}
+          </div>
+
+          {/* Description field */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[14px] font-semibold text-ink">Help your rider find you</span>
+            <p className="text-[13px] text-ink-2">
+              Describe the gate, building type, or a landmark right next to it — in your own words.
+            </p>
+            <input
+              type="text"
+              placeholder="e.g. Blue gate opposite Iya Risi shop"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              maxLength={140}
+              autoFocus
+              className="h-11 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white placeholder:text-ink-2/60 outline-none focus:border-brand transition-colors"
+            />
+            <div className="flex items-center px-0.5">
+              {descLen > 0 && descLen < 10 && (
+                <span className="text-[11px] text-ink-2">{10 - descLen} more chars needed</span>
+              )}
+              {descLen >= 10 && (
+                <span className="text-[11px] text-brand font-semibold">✓ Good description</span>
+              )}
+              <span className="text-[11px] text-ink-2 ml-auto">{descLen}/140</span>
+            </div>
+          </div>
+        </div>
+
+        {showSavePrompt ? (
+          <div className="px-4 pt-3 border-t border-line shrink-0 flex flex-col gap-2"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
+            <p className="text-[13px] font-semibold text-ink text-center">Save this spot as…</p>
+            <div className="flex gap-2 flex-wrap justify-center">
+              {SPOT_LABELS.map(label => (
+                <button key={label} type="button" disabled={savingSpot}
+                  onClick={() => saveSpotAndConfirm(label)}
+                  className="h-9 px-4 rounded-full border border-line bg-white font-semibold text-[13px] text-ink disabled:opacity-50">
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button type="button"
+              onClick={() => {
+                setShowSavePrompt(false)
+                if (confirmedPos) onConfirm(confirmedPos.lat, confirmedPos.lng, confirmedPos.areaName, description.trim())
+              }}
+              className="text-[13px] text-ink-2 text-center">
+              Skip, don&apos;t save
+            </button>
+          </div>
+        ) : (
+          <div className="px-4 pt-3 border-t border-line shrink-0"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
+            <Button fullWidth size="lg" disabled={!descOk} onClick={handleSave}>
+              {!descOk ? 'Describe your spot first' : 'Save my delivery spot'}
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Phase 1: map screen ───────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-white">
       {/* Header */}
@@ -360,7 +481,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
           </div>
         )}
 
-        {/* Search box — overlaid at top of map */}
+        {/* Search box */}
         <div className="absolute top-3 left-3 right-16 flex flex-col gap-1" style={{ zIndex: 1002 }}>
           <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-white shadow-md border border-line">
             {searchLoading
@@ -395,12 +516,8 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
               ) : (
                 <>
                   {searchResults?.map(result => (
-                    <button
-                      key={result.placeId}
-                      type="button"
-                      onClick={() => selectResult(result)}
-                      className="w-full px-3 py-2.5 text-left border-b border-line last:border-0 active:bg-surface"
-                    >
+                    <button key={result.placeId} type="button" onClick={() => selectResult(result)}
+                      className="w-full px-3 py-2.5 text-left border-b border-line last:border-0 active:bg-surface">
                       <p className="text-[14px] font-bold text-ink leading-snug">{result.main}</p>
                       {result.secondary && (
                         <p className="text-[12px] leading-snug" style={{ color: '#5B6168' }}>{result.secondary}</p>
@@ -456,54 +573,36 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
       </div>
 
       {/* Footer */}
-      <div className="px-4 pt-3 pb-5 border-t border-line shrink-0 flex flex-col gap-3"
+      <div className="px-4 pt-3 pb-5 border-t border-line shrink-0 flex flex-col gap-2.5"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
 
-        {/* Area label */}
-        {coveringArea && (
-          <div className="flex items-center justify-center gap-1.5">
-            <svg width="13" height="13" viewBox="0 0 36 50" fill="none">
-              <path d="M18 0C8.059 0 0 8.059 0 18C0 30 18 50 18 50C18 50 36 30 36 18C36 8.059 27.941 0 18 0Z" fill="#0B7A47"/>
-            </svg>
-            <span className="text-[14px] font-semibold text-ink">{coveringArea.name}</span>
-          </div>
-        )}
-
-        {/* Search hint (6 s after selecting a result) */}
-        {searchHint && (
-          <p className="text-[13px] text-brand-ink font-semibold text-center bg-brand-tint px-3 py-2 rounded-xl">
-            Now drag the map so the pin is on your exact building.
-          </p>
-        )}
-
-        {!searchHint && (
-          <p className="text-[13px] text-ink-2 text-center leading-snug">
-            {autoLocateError
-              ? autoLocateError
-              : 'Drag the map so the pin is on your exact spot, then confirm.'}
-          </p>
-        )}
-
-        {/* Description field */}
-        <div className="flex flex-col gap-1">
-          <input
-            type="text"
-            placeholder="e.g. Blue gate opposite Iya Risi shop"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            maxLength={140}
-            className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white placeholder:text-ink-2/60 outline-none focus:border-brand transition-colors"
-          />
-          <div className="flex items-center px-1">
-            {descLen > 0 && descLen < 10 && (
-              <span className="text-[11px] text-ink-2">{10 - descLen} more chars needed</span>
-            )}
-            {descLen >= 10 && (
-              <span className="text-[11px] text-brand font-semibold">✓ Good description</span>
-            )}
-            <span className="text-[11px] text-ink-2 ml-auto">{descLen}/140</span>
-          </div>
+        {/* Live place name */}
+        <div className="flex flex-col items-center gap-0.5 min-h-[36px] justify-center">
+          {reverseLoading && !previewName ? (
+            <span className="w-3 h-3 rounded-full border-2 border-brand/20 border-t-brand animate-spin" />
+          ) : previewName ? (
+            <>
+              <span className="text-[15px] font-bold text-ink text-center leading-snug">{previewName}</span>
+              {coveringArea && (
+                <span className="text-[12px]" style={{ color: '#5B6168' }}>Delivery zone: {coveringArea.name}</span>
+              )}
+            </>
+          ) : coveringArea ? (
+            <div className="flex items-center gap-1.5">
+              <svg width="12" height="12" viewBox="0 0 36 50" fill="none">
+                <path d="M18 0C8.059 0 0 8.059 0 18C0 30 18 50 18 50C18 50 36 30 36 18C36 8.059 27.941 0 18 0Z" fill="#0B7A47"/>
+              </svg>
+              <span className="text-[14px] font-semibold text-ink">{coveringArea.name}</span>
+            </div>
+          ) : null}
         </div>
+
+        {/* Instruction */}
+        <p className="text-[13px] text-ink-2 text-center leading-snug">
+          {searchHint
+            ? 'Now drag the map so the pin is on your exact building.'
+            : autoLocateError || 'Drag the map so the pin is on your exact spot, then confirm.'}
+        </p>
 
         {/* Waitlist panel */}
         {showWaitlist && !waitlistSent && (
@@ -525,33 +624,9 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
           </div>
         )}
 
-        {/* Save spot prompt */}
-        {showSavePrompt && (
-          <div className="flex flex-col gap-2 p-3 rounded-2xl bg-surface">
-            <p className="text-[13px] font-semibold text-ink text-center">Save this spot as…</p>
-            <div className="flex gap-2 flex-wrap justify-center">
-              {SPOT_LABELS.map(label => (
-                <button key={label} type="button" disabled={savingSpot}
-                  onClick={() => saveSpotAndConfirm(label)}
-                  className="h-9 px-4 rounded-full border border-line bg-white font-semibold text-[13px] text-ink disabled:opacity-50">
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button type="button"
-              onClick={() => {
-                setShowSavePrompt(false)
-                if (pendingConfirm) onConfirm(pendingConfirm.lat, pendingConfirm.lng, pendingConfirm.areaName, description.trim())
-              }}
-              className="text-[13px] text-ink-2 text-center">
-              Skip, don&apos;t save
-            </button>
-          </div>
-        )}
-
-        {!showWaitlist && !showSavePrompt && (
-          <Button fullWidth size="lg" disabled={autoLocating || isOutside || !descOk} onClick={handleConfirm}>
-            {isOutside ? 'Outside delivery area' : !descOk ? 'Describe your spot first' : 'Confirm spot'}
+        {!showWaitlist && (
+          <Button fullWidth size="lg" disabled={autoLocating || isOutside} onClick={handleConfirm}>
+            {isOutside ? 'Outside delivery area' : 'Confirm spot'}
           </Button>
         )}
       </div>
