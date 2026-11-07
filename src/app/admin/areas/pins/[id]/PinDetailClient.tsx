@@ -129,7 +129,7 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     setConfirmPending(null)
     setPasteValue('')
     setFlashSaved(true)
-    setTimeout(() => setFlashSaved(false), 3000)
+    setTimeout(() => { window.location.href = '/admin/areas/pins' }, 1500)
   }
 
   async function restorePin() {
@@ -138,11 +138,8 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     const res = await fetch(`/api/admin/areas/${area.id}/pin/restore`, { method: 'POST' })
     setRestoring(false)
     if (!res.ok) return
-    const prev = history[0]
-    setArea(a => ({ ...a, lat: prev.lat, lng: prev.lng, accuracy_m: prev.accuracy_m, pin_saved_at: prev.saved_at, pin_saved_by: prev.saved_by }))
-    setHistory(h => h.slice(1))
     setFlashSaved(true)
-    setTimeout(() => setFlashSaved(false), 3000)
+    setTimeout(() => { window.location.href = '/admin/areas/pins' }, 1500)
   }
 
   const hasPin = area.lat != null && area.lng != null

@@ -117,7 +117,11 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: P
   const closed = filtered.filter(v => !v.is_open)
 
   const displayName = pin?.areaName ?? 'Select area'
-  const pinOutsideCoverage = pin ? !findCoveringArea(pin.lat, pin.lng, areas) : false
+  const pinOutsideCoverage = pin
+    ? (pin.areaId
+        ? !areas.some(a => a.id === pin.areaId && a.is_active !== false && a.status === 'active')
+        : !findCoveringArea(pin.lat, pin.lng, areas))
+    : false
 
   return (
     <>

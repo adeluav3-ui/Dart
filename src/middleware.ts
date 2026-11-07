@@ -109,10 +109,6 @@ export async function middleware(request: NextRequest) {
       .single()
     const roles: string[] = profile?.roles ?? (profile?.role ? [profile.role] : [])
 
-    if (isAdminDash) {
-      console.log('[middleware/admin] user:', user.id, 'roles:', JSON.stringify(profile?.roles), 'pathname:', pathname)
-    }
-
     if (isAdminDash && !roles.includes('admin')) {
       if (roles.includes('vendor')) return redirectTo('/vendor')
       if (roles.includes('rider'))  return redirectTo('/rider')

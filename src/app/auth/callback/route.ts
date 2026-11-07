@@ -63,8 +63,6 @@ export async function GET(request: NextRequest) {
   const lastDash: string | null = profile.last_dashboard ?? null
   const roleDashes = ['/admin', '/vendor', '/rider']
 
-  console.log('[auth/callback] user:', user.id, 'roles:', JSON.stringify(profile.roles), 'lastDash:', lastDash)
-
   let destination: string
   if (lastDash && roleDashes.includes(lastDash) && roles.includes(lastDash.slice(1))) {
     destination = lastDash
@@ -77,8 +75,6 @@ export async function GET(request: NextRequest) {
   } else {
     destination = next
   }
-
-  console.log('[auth/callback] destination:', destination)
 
   const res = NextResponse.redirect(`${origin}${destination}`)
   // Explicitly write session cookies onto the redirect response so the
