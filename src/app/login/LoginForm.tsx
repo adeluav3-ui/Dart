@@ -77,7 +77,7 @@ export function LoginForm() {
 
   async function verifyCode() {
     setError('')
-    if (otp.length !== 6) { setError('Enter the 6-digit code from your email'); return }
+    if (otp.length !== 8) { setError('Enter the 8-digit code from your email'); return }
     setLoading(true)
 
     const { data: { session }, error: verifyError } = await supabase.auth.verifyOtp({
@@ -267,7 +267,7 @@ export function LoginForm() {
             <p className="text-[15px] text-ink-2 leading-relaxed">
               We sent a 6-digit code to{' '}
               <span className="font-semibold text-ink">{email}</span>.
-              Open your email, copy the code, and paste it here.
+              Open your email app, copy the 8-digit code, and paste it here.
             </p>
           </div>
 
@@ -276,9 +276,9 @@ export function LoginForm() {
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={6}
+              maxLength={8}
               autoComplete="one-time-code"
-              placeholder="000000"
+              placeholder="00000000"
               value={otp}
               onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
               onKeyDown={e => e.key === 'Enter' && verifyCode()}
