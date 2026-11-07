@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, phone, roles, last_dashboard')
+    .select('full_name, phone, role, roles, last_dashboard')
     .eq('id', user.id)
     .single()
 
@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
 
   // Route by role — only honour last_dashboard if it's a role-specific path
   // the user still holds (e.g. /admin → role 'admin').
-  const roles: string[] = profile.roles ?? ['customer']
+  // Fall back to singular `role` column if the array hasn't been populated.
+  const roles: string[] = profile.roles ?? (profile.role ? [profile.role] : ['customer'])
   const lastDash: string | null = profile.last_dashboard ?? null
   const roleDashes = ['/admin', '/vendor', '/rider']
 

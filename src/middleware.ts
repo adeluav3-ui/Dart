@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
   if (user && (pathname === '/login' || pathname === '/welcome')) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('roles, last_dashboard, full_name, phone')
+      .select('role, roles, last_dashboard, full_name, phone')
       .eq('id', user.id)
       .single()
 
@@ -52,7 +52,7 @@ export async function middleware(request: NextRequest) {
       return redirectTo('/complete-profile')
     }
 
-    const roles: string[] = profile?.roles ?? ['customer']
+    const roles: string[] = profile?.roles ?? (profile?.role ? [profile.role] : ['customer'])
     const lastDash = profile?.last_dashboard
 
     // Use last_dashboard if they have multiple non-customer roles
@@ -104,10 +104,10 @@ export async function middleware(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('roles')
+      .select('role, roles')
       .eq('id', user.id)
       .single()
-    const roles: string[] = profile?.roles ?? []
+    const roles: string[] = profile?.roles ?? (profile?.role ? [profile.role] : [])
 
     if (isAdminDash) {
       console.log('[middleware/admin] user:', user.id, 'roles:', JSON.stringify(profile?.roles), 'pathname:', pathname)
