@@ -43,6 +43,9 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
   const accuracyCircleRef = useRef<any>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reverseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Set to true when a search result is selected; suppresses the reverse-geocode
+  // triggered by the subsequent setView() so the Google name isn't overwritten.
+  const skipNextReverseRef = useRef(false)
 
   // Phase: 'pin' = map + search, 'describe' = write your own description
   const [phase, setPhase] = useState<'pin' | 'describe'>('pin')
@@ -107,6 +110,8 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
   // Reverse geocoding (debounced, fires on moveend)
   const scheduleReverseGeocode = useCallback((lat: number, lng: number) => {
     if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
+    // Skip one cycle when a search result just moved the map — the Google name is better
+    if (skipNextReverseRef.current) { skipNextReverseRef.current = false; return }
     reverseDebounceRef.current = setTimeout(async () => {
       setReverseLoading(true)
       try {
@@ -287,7 +292,10 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
       )
       const data = await res.json()
       if (data.unavailable || typeof data.lat !== 'number' || typeof data.lng !== 'number') return
-      if (mapRef.current) mapRef.current.setView([data.lat, data.lng], 18)
+      if (mapRef.current) {
+        skipNextReverseRef.current = true
+        mapRef.current.setView([data.lat, data.lng], 18)
+      }
       setSearchHint(true)
       setTimeout(() => setSearchHint(false), 6000)
     } catch {}
