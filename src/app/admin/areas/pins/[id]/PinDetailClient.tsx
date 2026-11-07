@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, Navigation, RotateCcw, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { Area, AreaPinHistory } from '@/types/database'
@@ -32,6 +33,7 @@ function relDate(iso: string): string {
 }
 
 export function PinDetailClient({ initialArea, initialHistory, correctionRate, correctionTotal, userId }: Props) {
+  const router = useRouter()
   const [area, setArea] = useState<Area>(initialArea)
   const [history, setHistory] = useState<AreaPinHistory[]>(initialHistory)
   const [locPhase, setLocPhase] = useState<LocPhase>('idle')
@@ -131,6 +133,7 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     setPasteValue('')
     setFlashSaved(true)
     setTimeout(() => setFlashSaved(false), 3000)
+    router.refresh()
   }
 
   async function restorePin() {
@@ -144,6 +147,7 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     setHistory(h => h.slice(1))
     setFlashSaved(true)
     setTimeout(() => setFlashSaved(false), 3000)
+    router.refresh()
   }
 
   const hasPin = area.lat != null && area.lng != null
