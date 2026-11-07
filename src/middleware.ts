@@ -2,6 +2,17 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl
+
+  // If a Supabase OAuth code lands on the wrong page (Site URL misconfiguration),
+  // forward it to the real callback handler instead of breaking silently.
+  const oauthCode = searchParams.get('code')
+  if (oauthCode && pathname !== '/auth/callback' && !pathname.startsWith('/api/')) {
+    const dest = request.nextUrl.clone()
+    dest.pathname = '/auth/callback'
+    return NextResponse.redirect(dest)
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -22,7 +33,6 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const { pathname } = request.nextUrl
 
   function redirectTo(path: string) {
     const url = request.nextUrl.clone()
