@@ -1,5 +1,4 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 
@@ -13,28 +12,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent('Invalid sign-in link')}`)
   }
 
-  const cookieStore = cookies()
+  const pendingCookies: { name: string; value: string; options: CookieOptions }[] = []
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        },
+        getAll() { return request.cookies.getAll() },
+        setAll(list: { name: string; value: string; options: CookieOptions }[]) { pendingCookies.push(...list) },
       },
     }
   )
 
   const { error } = await supabase.auth.verifyOtp({ token_hash, type })
   if (error) {
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
+    const res = NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
+    pendingCookies.forEach(({ name, value, options }) => res.cookies.set(name, value, options))
+    return res
   }
 
-  // Session is now written to cookies. Determine where to send the user.
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.redirect(`${origin}/login`)
@@ -51,7 +48,9 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams({ next })
     const googleName = user.user_metadata?.full_name ?? user.user_metadata?.name ?? ''
     if (googleName) params.set('name', googleName)
-    return NextResponse.redirect(`${origin}/complete-profile?${params.toString()}`)
+    const res = NextResponse.redirect(`${origin}/complete-profile?${params.toString()}`)
+    pendingCookies.forEach(({ name, value, options }) => res.cookies.set(name, value, options))
+    return res
   }
 
   // Route by role
@@ -71,5 +70,7 @@ export async function GET(request: NextRequest) {
     destination = next
   }
 
-  return NextResponse.redirect(`${origin}${destination}`)
+  const res = NextResponse.redirect(`${origin}${destination}`)
+  pendingCookies.forEach(({ name, value, options }) => res.cookies.set(name, value, options))
+  return res
 }

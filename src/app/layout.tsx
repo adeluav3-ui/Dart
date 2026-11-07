@@ -48,6 +48,7 @@ export const viewport: Viewport = {
 
 import { NavigationProgress } from '@/components/NavigationProgress'
 import { SplashScreen } from '@/components/SplashScreen'
+import { AuthListener } from '@/components/AuthListener'
 
 export default function RootLayout({
   children,
@@ -57,6 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en-NG" className={`${heading.variable} ${body.variable}`} style={{ backgroundColor: '#F6F7F5' }}>
       <body>
+        <AuthListener />
         <SplashScreen />
         <NavigationProgress />
         {children}
