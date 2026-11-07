@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ArrowLeft, Navigation, RotateCcw, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { Area, AreaPinHistory } from '@/types/database'
@@ -33,7 +31,6 @@ function relDate(iso: string): string {
 }
 
 export function PinDetailClient({ initialArea, initialHistory, correctionRate, correctionTotal, userId }: Props) {
-  const router = useRouter()
   const [area, setArea] = useState<Area>(initialArea)
   const [history, setHistory] = useState<AreaPinHistory[]>(initialHistory)
   const [locPhase, setLocPhase] = useState<LocPhase>('idle')
@@ -133,7 +130,6 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     setPasteValue('')
     setFlashSaved(true)
     setTimeout(() => setFlashSaved(false), 3000)
-    router.refresh()
   }
 
   async function restorePin() {
@@ -147,7 +143,6 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     setHistory(h => h.slice(1))
     setFlashSaved(true)
     setTimeout(() => setFlashSaved(false), 3000)
-    router.refresh()
   }
 
   const hasPin = area.lat != null && area.lng != null
@@ -156,9 +151,9 @@ export function PinDetailClient({ initialArea, initialHistory, correctionRate, c
     <div className="max-w-lg mx-auto flex flex-col gap-4 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/admin/areas/pins" aria-label="Back" className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-line">
+        <a href="/admin/areas/pins" aria-label="Back" className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-line">
           <ArrowLeft size={18} />
-        </Link>
+        </a>
         <div>
           <h2 className="font-heading font-bold text-xl leading-tight">{area.name}</h2>
           <span className={`text-[13px] font-semibold ${hasPin ? 'text-brand' : 'text-[#F59E0B]'}`}>
