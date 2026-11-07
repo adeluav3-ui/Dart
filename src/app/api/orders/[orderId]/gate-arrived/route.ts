@@ -14,7 +14,7 @@ export async function POST(
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, rider_id, status, is_gate_pickup, gate_arrived_at, address_phone, customer_id')
+    .select('id, rider_id, status, is_gate_pickup, gate_arrived_at, address_phone, customer_id, code')
     .eq('id', params.orderId)
     .single()
 
@@ -39,7 +39,49 @@ export async function POST(
     note: 'Rider arrived at gate',
   })
 
-  // TODO: email customer at their account email: "Your rider is at the gate — come out to collect your order."
+  // Look up rider phone
+  const { data: riderProfile } = await admin
+    .from('profiles')
+    .select('phone')
+    .eq('id', user.id)
+    .single()
+
+  // Look up customer email
+  const { data: customerAuth } = await admin.auth.admin.getUserById(order.customer_id)
+  const customerEmail = customerAuth.user?.email ?? null
+
+  // Enqueue at_gate notification to customer (email + push)
+  await admin.rpc('enqueue_notification', {
+    p_event: 'at_gate',
+    p_order_id: order.id,
+    p_recipient_user_id: order.customer_id,
+    p_recipient_email: customerEmail,
+    p_recipient_role: 'customer',
+    p_channel: 'email',
+    p_title: 'Your rider is at the gate',
+    p_body: 'Your rider is waiting at the OOUTH Main Gate — come out now.',
+    p_url: `/track/${order.id}`,
+    p_email_subject: `Your rider is at the gate — order ${order.code}`,
+    p_email_template: 'at_gate',
+    p_payload: {
+      order_code: order.code,
+      rider_phone: riderProfile?.phone ?? '',
+      order_id: order.id,
+    },
+    p_dedupe_key: `at_gate:${order.id}`,
+  })
+
+  await admin.rpc('enqueue_notification', {
+    p_event: 'at_gate',
+    p_order_id: order.id,
+    p_recipient_user_id: order.customer_id,
+    p_recipient_role: 'customer',
+    p_channel: 'push',
+    p_title: 'Rider at the gate!',
+    p_body: 'Come out now — your rider is at the OOUTH Main Gate.',
+    p_url: `/track/${order.id}`,
+    p_dedupe_key: `at_gate_push:${order.id}`,
+  })
 
   return NextResponse.json({ ok: true })
 }

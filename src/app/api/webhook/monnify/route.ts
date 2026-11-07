@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendOrderPaidEmail } from '@/lib/email'
-import { sendVendorPush } from '@/lib/webpush'
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,46 +76,8 @@ export async function POST(req: NextRequest) {
       p_note: `Monnify: ${transactionReference}`,
     })
 
-    // 6. Email customer their PIN (fire-and-forget)
-    const fullOrder = await admin
-      .from('orders')
-      .select('code, delivery_pin, subtotal, delivery_fee, service_fee, total, customer_id, vendor_id')
-      .eq('id', order.id)
-      .single()
-
-    if (fullOrder.data) {
-      // Email customer their PIN
-      const { data: customerAuth } = await admin.auth.admin.getUserById(
-        fullOrder.data.customer_id
-      )
-      if (customerAuth.user?.email) {
-        sendOrderPaidEmail({
-          to: customerAuth.user.email,
-          orderCode: fullOrder.data.code,
-          deliveryPin: fullOrder.data.delivery_pin,
-          subtotal: fullOrder.data.subtotal,
-          deliveryFee: fullOrder.data.delivery_fee,
-          serviceFee: fullOrder.data.service_fee,
-          total: fullOrder.data.total,
-          orderId: order.id,
-        }).catch(() => {})
-      }
-
-      // Web push to vendor — repeated every 60 s on the vendor board until accepted/rejected
-      const { data: vendorRow } = await admin
-        .from('vendors')
-        .select('owner_id, name')
-        .eq('id', fullOrder.data.vendor_id)
-        .single()
-      if (vendorRow?.owner_id) {
-        sendVendorPush(vendorRow.owner_id, {
-          type: 'new_order',
-          orderId: order.id,
-          orderCode: fullOrder.data.code,
-          vendorName: vendorRow.name,
-        }).catch(() => {})
-      }
-    }
+    // Notifications (receipt email + vendor push) are sent by the
+    // _notify_on_order_event trigger inside transition_order above.
 
     return NextResponse.json({ received: true })
   } catch (err) {

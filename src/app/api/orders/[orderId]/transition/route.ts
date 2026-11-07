@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import {
-  sendOrderPickedUpEmail,
-  sendOrderDeliveredEmail,
-  sendRefundEmail,
-} from '@/lib/email'
 import type { OrderStatus } from '@/types/database'
 
 export async function POST(
@@ -85,38 +80,13 @@ export async function POST(
       await triggerRefund(params.orderId, admin)
     }
 
-    // Email customer on key status changes (fire-and-forget)
-    if (toStatus === 'picked_up' || toStatus === 'delivered') {
-      notifyCustomer(params.orderId, toStatus, admin).catch(() => {})
-    }
+    // Notifications (on_the_way, delivered, cancelled_refund) are sent by the
+    // _notify_on_order_event trigger inside transition_order above.
 
     return NextResponse.json({ order: updated })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal error'
     return NextResponse.json({ error: msg }, { status: 500 })
-  }
-}
-
-async function notifyCustomer(
-  orderId: string,
-  toStatus: OrderStatus,
-  admin: ReturnType<typeof createAdminClient>
-) {
-  const { data: order } = await admin
-    .from('orders')
-    .select('code, delivery_pin, customer_id')
-    .eq('id', orderId)
-    .single()
-  if (!order) return
-
-  const { data: authUser } = await admin.auth.admin.getUserById(order.customer_id)
-  const email = authUser.user?.email
-  if (!email) return
-
-  if (toStatus === 'picked_up') {
-    await sendOrderPickedUpEmail({ to: email, orderCode: order.code, deliveryPin: order.delivery_pin })
-  } else if (toStatus === 'delivered') {
-    await sendOrderDeliveredEmail({ to: email, orderCode: order.code, orderId })
   }
 }
 

@@ -16,7 +16,7 @@ export async function POST(
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, rider_id, status, gate_arrived_at, gate_no_show')
+    .select('id, code, rider_id, status, gate_arrived_at, gate_no_show, customer_id, vendor_id')
     .eq('id', params.orderId)
     .single()
 
@@ -51,7 +51,53 @@ export async function POST(
     note: 'Customer did not respond — awaiting admin decision',
   })
 
-  // TODO: email admin
+  // Look up customer email and vendor name
+  const [{ data: customerAuth }, { data: vendor }] = await Promise.all([
+    admin.auth.admin.getUserById(order.customer_id),
+    admin.from('vendors').select('name').eq('id', order.vendor_id).single(),
+  ])
+  const customerEmail = customerAuth.user?.email ?? null
+  const vendorName = vendor?.name ?? ''
+
+  // no_show email to customer
+  await admin.rpc('enqueue_notification', {
+    p_event: 'no_show',
+    p_order_id: order.id,
+    p_recipient_user_id: order.customer_id,
+    p_recipient_email: customerEmail,
+    p_recipient_role: 'customer',
+    p_channel: 'email',
+    p_title: "We couldn't deliver your order",
+    p_body: 'Your rider waited at the gate but could not reach you.',
+    p_url: `/track/${order.id}`,
+    p_email_subject: `Order ${order.code} — delivery unsuccessful`,
+    p_email_template: 'no_show',
+    p_payload: {
+      order_code: order.code,
+      order_id: order.id,
+      vendor_name: vendorName,
+    },
+    p_dedupe_key: `no_show:${order.id}`,
+  })
+
+  // Admin alert
+  await admin.rpc('enqueue_notification', {
+    p_event: 'admin_no_show',
+    p_order_id: order.id,
+    p_recipient_role: 'admin',
+    p_channel: 'email',
+    p_title: `No-show — order ${order.code}`,
+    p_body: `Customer did not collect order ${order.code} from ${vendorName}. Awaiting admin decision.`,
+    p_email_subject: `No-show: order ${order.code}`,
+    p_email_template: 'admin_alert',
+    p_payload: {
+      title: `No-show — order ${order.code}`,
+      message: `Customer did not collect order ${order.code} from ${vendorName} after the rider waited ${WAIT_MINUTES} minutes at the gate.`,
+      url: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/orders/${order.id}`,
+      action_label: 'View order',
+    },
+    p_dedupe_key: `admin_no_show:${order.id}`,
+  })
 
   return NextResponse.json({ ok: true })
 }
