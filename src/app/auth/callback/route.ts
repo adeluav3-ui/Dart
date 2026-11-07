@@ -55,12 +55,15 @@ export async function GET(request: NextRequest) {
     return res
   }
 
-  // Route by role
+  // Route by role — only honour last_dashboard if it's a role-specific path
+  // the user still holds (e.g. /admin → role 'admin'). Never use /home as a
+  // redirect target here; that would send admins to the customer dashboard.
   const roles: string[] = profile.roles ?? ['customer']
   const lastDash: string | null = profile.last_dashboard ?? null
+  const roleDashes = ['/admin', '/vendor', '/rider']
 
   let destination: string
-  if (lastDash && roles.some(r => r !== 'customer')) {
+  if (lastDash && roleDashes.includes(lastDash) && roles.includes(lastDash.slice(1))) {
     destination = lastDash
   } else if (roles.includes('admin')) {
     destination = '/admin'
