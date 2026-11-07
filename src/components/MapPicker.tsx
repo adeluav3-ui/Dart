@@ -46,10 +46,15 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
         zoomControl: false,
       })
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(map)
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+      const tileUrl = mapboxToken
+        ? `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+      const attribution = mapboxToken
+        ? '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+
+      L.tileLayer(tileUrl, { attribution, maxZoom: 22, tileSize: 512, zoomOffset: -1 }).addTo(map)
 
       L.control.zoom({ position: 'bottomright' }).addTo(map)
 
