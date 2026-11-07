@@ -11,11 +11,13 @@ import { Input } from '@/components/ui/Input'
 
 type Step = 'email' | 'sent' | 'profile'
 
-function roleHome(role: string | null | undefined) {
+function roleDestination(role: string | null | undefined, next: string): string {
+  // Non-customer roles always go to their dashboard, ignoring `next`.
+  // Only customers honour the `next` redirect (e.g. back to /checkout).
+  if (role === 'admin')  return '/admin'
   if (role === 'vendor') return '/vendor'
-  if (role === 'rider') return '/rider'
-  if (role === 'admin') return '/admin'
-  return '/home'
+  if (role === 'rider')  return '/rider'
+  return next
 }
 
 // ── Main form ─────────────────────────────────────────────────────────────────
@@ -99,7 +101,7 @@ export function LoginForm() {
     if (!profile?.full_name || !profile?.phone) {
       setStep('profile')
     } else {
-      window.location.href = next === '/home' ? roleHome(profile.role) : next
+      window.location.href = roleDestination(profile.role, next)
     }
   }
 
@@ -128,7 +130,7 @@ export function LoginForm() {
       .eq('id', user.id)
       .single()
 
-    window.location.href = next === '/home' ? roleHome(profile?.role) : next
+    window.location.href = roleDestination(profile?.role, next)
   }
 
   async function signInWithGoogle() {
