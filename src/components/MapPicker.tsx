@@ -11,7 +11,7 @@ import type { Area, DeliverySpot, DeliverySpotLabel } from '@/types/database'
 interface Props {
   initialLat?: number
   initialLng?: number
-  onConfirm: (lat: number, lng: number, areaName: string, description?: string) => void
+  onConfirm: (lat: number, lng: number, areaName: string, description: string, label?: string) => void
   onClose: () => void
   coverageAreas?: unknown[]
   areas?: Area[]
@@ -286,6 +286,9 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     setWaitlistSent(true)
   }
 
+  const descLen = description.trim().length
+  const descOk = descLen >= 10 && descLen <= 140
+
   async function saveSpotAndConfirm(label: DeliverySpotLabel) {
     if (!pendingConfirm || !userId) return
     setSavingSpot(true)
@@ -301,19 +304,20 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     })
     setSavingSpot(false)
     setShowSavePrompt(false)
-    onConfirm(pendingConfirm.lat, pendingConfirm.lng, pendingConfirm.areaName, description.trim() || undefined)
+    onConfirm(pendingConfirm.lat, pendingConfirm.lng, pendingConfirm.areaName, description.trim(), label)
   }
 
   function handleConfirm() {
     const covering = findCoveringArea(center.lat, center.lng, areas ?? [])
     if (!covering) { setShowWaitlist(true); return }
+    if (!descOk) return
     const areaName = covering.name
-    if (userId && description.trim()) {
+    if (userId) {
       setPendingConfirm({ lat: center.lat, lng: center.lng, areaName })
       setShowSavePrompt(true)
       return
     }
-    onConfirm(center.lat, center.lng, areaName, description.trim() || undefined)
+    onConfirm(center.lat, center.lng, areaName, description.trim())
   }
 
   const isOutside = !findCoveringArea(center.lat, center.lng, areas ?? [])
@@ -389,19 +393,30 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
                   No places found. Drag the map to your spot instead.
                 </p>
               ) : (
-                searchResults?.map(result => (
-                  <button
-                    key={result.placeId}
-                    type="button"
-                    onClick={() => selectResult(result)}
-                    className="w-full px-3 py-2.5 text-left border-b border-line last:border-0 active:bg-surface"
-                  >
-                    <p className="text-[14px] font-bold text-ink leading-snug">{result.main}</p>
-                    {result.secondary && (
-                      <p className="text-[12px] leading-snug" style={{ color: '#5B6168' }}>{result.secondary}</p>
-                    )}
-                  </button>
-                ))
+                <>
+                  {searchResults?.map(result => (
+                    <button
+                      key={result.placeId}
+                      type="button"
+                      onClick={() => selectResult(result)}
+                      className="w-full px-3 py-2.5 text-left border-b border-line last:border-0 active:bg-surface"
+                    >
+                      <p className="text-[14px] font-bold text-ink leading-snug">{result.main}</p>
+                      {result.secondary && (
+                        <p className="text-[12px] leading-snug" style={{ color: '#5B6168' }}>{result.secondary}</p>
+                      )}
+                    </button>
+                  ))}
+                  <div className="px-3 py-1.5 flex items-center justify-end gap-1 bg-surface/60">
+                    <span className="text-[10px] text-ink-2">Powered by</span>
+                    <svg viewBox="0 0 44 16" width="38" height="14" xmlns="http://www.w3.org/2000/svg" aria-label="Google">
+                      <path d="M17.6 8.2c0-.5 0-1-.1-1.5H9v2.9h4.8c-.2 1.1-.9 2-1.9 2.6v2.1h3c1.8-1.6 2.7-4 2.7-6.1z" fill="#4285F4"/>
+                      <path d="M9 17c2.4 0 4.5-.8 6-2.2l-3-2.1c-.8.5-1.8.8-3 .8-2.3 0-4.3-1.6-5-3.7H.9v2.2C2.4 15.1 5.5 17 9 17z" fill="#34A853"/>
+                      <path d="M4 9.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V4H.9C.3 5.2 0 6.6 0 8s.3 2.8.9 4L4 9.8z" fill="#FBBC05"/>
+                      <path d="M9 3.6c1.3 0 2.5.4 3.4 1.3l2.5-2.5C13.5.9 11.4 0 9 0 5.5 0 2.4 1.9.9 4.8L4 7c.7-2.1 2.7-3.4 5-3.4z" fill="#EA4335"/>
+                    </svg>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -470,13 +485,25 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
         )}
 
         {/* Description field */}
-        <input
-          type="text"
-          placeholder="Describe the spot — gate colour, landmark nearby…"
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white placeholder:text-ink-2/60 outline-none focus:border-brand transition-colors"
-        />
+        <div className="flex flex-col gap-1">
+          <input
+            type="text"
+            placeholder="e.g. Blue gate opposite Iya Risi shop"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            maxLength={140}
+            className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white placeholder:text-ink-2/60 outline-none focus:border-brand transition-colors"
+          />
+          <div className="flex items-center px-1">
+            {descLen > 0 && descLen < 10 && (
+              <span className="text-[11px] text-ink-2">{10 - descLen} more chars needed</span>
+            )}
+            {descLen >= 10 && (
+              <span className="text-[11px] text-brand font-semibold">✓ Good description</span>
+            )}
+            <span className="text-[11px] text-ink-2 ml-auto">{descLen}/140</span>
+          </div>
+        </div>
 
         {/* Waitlist panel */}
         {showWaitlist && !waitlistSent && (
@@ -514,7 +541,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
             <button type="button"
               onClick={() => {
                 setShowSavePrompt(false)
-                if (pendingConfirm) onConfirm(pendingConfirm.lat, pendingConfirm.lng, pendingConfirm.areaName, description.trim() || undefined)
+                if (pendingConfirm) onConfirm(pendingConfirm.lat, pendingConfirm.lng, pendingConfirm.areaName, description.trim())
               }}
               className="text-[13px] text-ink-2 text-center">
               Skip, don&apos;t save
@@ -523,8 +550,8 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
         )}
 
         {!showWaitlist && !showSavePrompt && (
-          <Button fullWidth size="lg" disabled={autoLocating} onClick={handleConfirm}>
-            {isOutside ? 'Outside delivery area' : 'Confirm spot'}
+          <Button fullWidth size="lg" disabled={autoLocating || isOutside || !descOk} onClick={handleConfirm}>
+            {isOutside ? 'Outside delivery area' : !descOk ? 'Describe your spot first' : 'Confirm spot'}
           </Button>
         )}
       </div>

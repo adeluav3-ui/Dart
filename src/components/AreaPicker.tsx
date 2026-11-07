@@ -14,7 +14,7 @@ interface Props {
   areas: Area[]
   zones: Zone[]
   selectedId: string
-  onSave: (areaId: string | null, areaName: string, lat: number, lng: number, description?: string) => void
+  onSave: (areaId: string | null, areaName: string, lat: number, lng: number, description: string, label?: string) => void
   onClose?: () => void
   coverageAreas?: CoverageArea[]
   userId?: string | null
@@ -28,6 +28,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
   const [selected, setSelected] = useState(selectedId)
   const [search, setSearch] = useState('')
   const [showMap, setShowMap] = useState(false)
+  const [description, setDescription] = useState('')
   const [waitlistArea, setWaitlistArea] = useState<string | null>(null)
   const [waitlistAreaName, setWaitlistAreaName] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
@@ -110,14 +111,17 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
     setWaitlistSent(true)
   }
 
+  const descLen = description.trim().length
+  const descOk = descLen >= 10 && descLen <= 140
+
   function handleContinue() {
     const area = activeAreas.find(a => a.id === selected && a.status === 'active')
-    if (!area || area.lat == null || area.lng == null) return
-    onSave(area.id, areaDisplayName(area), area.lat, area.lng)
+    if (!area || area.lat == null || area.lng == null || !descOk) return
+    onSave(area.id, areaDisplayName(area), area.lat, area.lng, description.trim())
   }
 
-  function handleMapConfirm(lat: number, lng: number, address: string, description?: string) {
-    onSave(null, address || 'My location', lat, lng, description)
+  function handleMapConfirm(lat: number, lng: number, address: string, description: string, label?: string) {
+    onSave(null, address || 'My location', lat, lng, description, label)
   }
 
   const selectedArea = activeAreas.find(a => a.id === selected && a.status === 'active')
@@ -323,11 +327,34 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
           </div>
         </div>
 
-        {/* Continue button (only when area selected from list) */}
+        {/* Description + confirm (when area selected from list) */}
         {canContinue && (
-          <div className="px-4 pt-3 pb-3 border-t border-line shrink-0">
-            <Button onClick={handleContinue} fullWidth size="lg">
-              Continue with {selectedArea ? areaDisplayName(selectedArea) : ''}
+          <div className="px-4 pt-3 border-t border-line shrink-0 flex flex-col gap-2"
+            style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-semibold text-ink-2">
+                Describe your exact spot <span className="text-danger">*</span>
+              </span>
+              <input
+                type="text"
+                placeholder="e.g. Blue gate opposite Iya Risi shop"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                maxLength={140}
+                className="h-10 px-3 rounded-xl border border-line font-body text-[14px] text-ink bg-white placeholder:text-ink-2/60 outline-none focus:border-brand transition-colors"
+              />
+              <div className="flex items-center px-0.5">
+                {descLen > 0 && descLen < 10 && (
+                  <span className="text-[11px] text-ink-2">{10 - descLen} more chars needed</span>
+                )}
+                {descLen >= 10 && (
+                  <span className="text-[11px] text-brand font-semibold">✓</span>
+                )}
+                <span className="text-[11px] text-ink-2 ml-auto">{descLen}/140</span>
+              </div>
+            </label>
+            <Button onClick={handleContinue} disabled={!descOk} fullWidth size="lg">
+              Confirm spot in {selectedArea ? areaDisplayName(selectedArea) : ''}
             </Button>
           </div>
         )}

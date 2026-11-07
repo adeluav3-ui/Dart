@@ -19,6 +19,7 @@ interface DeliveryPin {
   lat: number
   lng: number
   description?: string
+  label?: string
 }
 
 interface DeliveryQuote {
@@ -101,12 +102,18 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
   const serviceFee = calcServiceFee(subtotal, feeSettings)
   const total = subtotal + deliveryFee + serviceFee
 
-  function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description?: string) {
-    const newPin: DeliveryPin = { areaId, areaName, lat, lng, description }
+  function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description: string, label?: string) {
+    const newPin: DeliveryPin = { areaId, areaName, lat, lng, description, label }
     setPin(newPin)
     localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
   }
+
+  // Pre-fill landmark from saved pin description
+  useEffect(() => {
+    if (pin?.description && !landmark) setLandmark(pin.description)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin?.description])
 
   async function placeOrder() {
     if (submittingRef.current) return
@@ -218,11 +225,22 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
             className="flex items-center gap-3 w-full px-4 py-3 rounded-2xl border border-line text-left hover:bg-surface transition-colors"
           >
             <MapPin size={18} stroke="#0B7A47" className="flex-none" />
-            <span className="flex-1 flex flex-col">
+            <span className="flex-1 flex flex-col min-w-0">
               <span className="text-xs font-semibold text-ink-2">Delivery spot</span>
-              <span className="text-[14px] font-semibold text-ink">
-                {pin ? pin.areaName : 'Select area or pin on map'}
-              </span>
+              {pin ? (
+                <>
+                  <span className="text-[14px] font-semibold text-ink leading-snug truncate">
+                    {pin.label ? `${pin.label} · ` : ''}{pin.description || pin.areaName}
+                  </span>
+                  {pin.description && (
+                    <span className="text-[12px] leading-snug" style={{ color: '#5B6168' }}>
+                      Near {pin.areaName}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-[14px] font-semibold text-ink">Select area or pin on map</span>
+              )}
             </span>
             <span className="text-[13px] text-brand font-semibold">Change</span>
           </button>

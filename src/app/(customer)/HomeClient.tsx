@@ -19,6 +19,7 @@ interface DeliveryPin {
   lat: number
   lng: number
   description?: string
+  label?: string
 }
 
 const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
@@ -70,8 +71,8 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: P
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areas, userId])
 
-  function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description?: string) {
-    const newPin: DeliveryPin = { areaId, areaName, lat, lng, description }
+  function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description: string, label?: string) {
+    const newPin: DeliveryPin = { areaId, areaName, lat, lng, description, label }
     setPin(newPin)
     localStorage.setItem(deliveryKey(userId), JSON.stringify(newPin))
     setPickerOpen(false)
@@ -116,7 +117,9 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: P
   const open = filtered.filter(v => v.is_open)
   const closed = filtered.filter(v => !v.is_open)
 
-  const displayName = pin?.areaName ?? 'Select area'
+  const displayName = pin?.description
+    ? (pin.label ? `${pin.label} · ${pin.description}` : pin.description)
+    : (pin?.areaName ?? 'Select area')
   const pinOutsideCoverage = pin
     ? (pin.areaId
         ? !areas.some(a => a.id === pin.areaId && a.is_active !== false && a.status === 'active')
@@ -155,12 +158,17 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: P
             <span className="w-8 h-8 rounded-full bg-brand-tint flex items-center justify-center flex-none">
               <MapPin size={16} stroke="#0B7A47" />
             </span>
-            <span className="flex flex-col">
+            <span className="flex flex-col min-w-0">
               <span className="text-[11px] text-ink-2">Deliver to</span>
-              <span className="text-[14px] font-bold flex items-center gap-1">
-                {displayName}
-                <ChevronDown size={13} strokeWidth={2.2} />
+              <span className="text-[14px] font-bold flex items-center gap-1 leading-snug">
+                <span className="truncate">{displayName}</span>
+                <ChevronDown size={13} strokeWidth={2.2} className="shrink-0" />
               </span>
+              {pin?.description && (
+                <span className="text-[11px] leading-snug" style={{ color: '#5B6168' }}>
+                  Near {pin.areaName}
+                </span>
+              )}
             </span>
           </button>
 
