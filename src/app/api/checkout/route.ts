@@ -297,6 +297,35 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// In-process Monnify token cache — one auth call is reused across all concurrent
+// requests until the token is 60 s from expiry, then lazily refreshed.
+let _monnifyCache: { token: string; expiresAt: number } | null = null
+
+async function getMonnifyToken(baseUrl: string, apiKey: string, secretKey: string): Promise<string | null> {
+  if (_monnifyCache && _monnifyCache.expiresAt > Date.now() + 60_000) {
+    return _monnifyCache.token
+  }
+
+  const encoded = Buffer.from(`${apiKey}:${secretKey}`).toString('base64')
+  const res = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { Authorization: `Basic ${encoded}`, 'Content-Type': 'application/json' },
+  })
+
+  if (!res.ok) {
+    console.error('Monnify auth failed:', await res.text())
+    return null
+  }
+
+  const { responseBody } = await res.json()
+  _monnifyCache = {
+    token: responseBody.accessToken,
+    // expiresIn is in seconds; default to 1 h if absent
+    expiresAt: Date.now() + (responseBody.expiresIn ?? 3600) * 1000,
+  }
+  return _monnifyCache.token
+}
+
 async function initMonnifyTransaction({
   reference,
   orderId,
@@ -315,21 +344,8 @@ async function initMonnifyTransaction({
   const contractCode = process.env.MONNIFY_CONTRACT_CODE!
   const baseUrl = process.env.MONNIFY_BASE_URL!
 
-  const authToken = Buffer.from(`${apiKey}:${secretKey}`).toString('base64')
-  const tokenRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${authToken}`,
-      'Content-Type': 'application/json',
-    },
-  })
-
-  if (!tokenRes.ok) {
-    console.error('Monnify auth failed:', await tokenRes.text())
-    return { checkoutUrl: null }
-  }
-
-  const { responseBody: { accessToken } } = await tokenRes.json()
+  const accessToken = await getMonnifyToken(baseUrl, apiKey, secretKey)
+  if (!accessToken) return { checkoutUrl: null }
 
   const txRes = await fetch(`${baseUrl}/api/v1/merchant/transactions/init-transaction`, {
     method: 'POST',
