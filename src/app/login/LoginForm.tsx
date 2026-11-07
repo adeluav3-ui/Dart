@@ -33,6 +33,7 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || searchParams.get('redirect') || '/home'
   const startComplete = searchParams.get('complete') === '1'
+  const urlError = searchParams.get('error') ?? ''
   const supabase = createClient()
 
   // If auth/callback sent us here with ?complete=1, jump to profile step
@@ -61,7 +62,7 @@ export function LoginForm() {
       email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(next)}`,
       },
     })
     setLoading(false)
@@ -203,7 +204,9 @@ export function LoginForm() {
               </div>
             </label>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {(error || urlError) && (
+              <p className="text-sm text-danger">{error || urlError}</p>
+            )}
 
             <Button onClick={sendLink} loading={loading} fullWidth size="lg">
               Continue with email
