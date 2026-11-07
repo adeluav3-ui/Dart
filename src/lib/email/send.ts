@@ -4,8 +4,8 @@ import { Resend } from 'resend'
 interface SendEmailOptions {
   to: string
   subject: string
+  text: string
   html?: string
-  text?: string
 }
 
 interface SendEmailResult {
@@ -40,9 +40,9 @@ export async function sendEmail(
       from,
       to: opts.to,
       subject: opts.subject,
-      html: opts.html,
       text: opts.text,
-      replyTo: process.env.EMAIL_REPLY_TO,
+      ...(opts.html !== undefined && { html: opts.html }),
+      ...(process.env.EMAIL_REPLY_TO && { replyTo: process.env.EMAIL_REPLY_TO }),
     })
 
     if (error) {
