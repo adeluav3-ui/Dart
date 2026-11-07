@@ -22,6 +22,7 @@ function roleHome(role: string | null | undefined) {
 export function LoginForm() {
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
+  const [otp, setOtp] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
@@ -71,6 +72,36 @@ export function LoginForm() {
     } else {
       setStep('sent')
       startResendTimer()
+    }
+  }
+
+  async function verifyCode() {
+    setError('')
+    if (otp.length !== 6) { setError('Enter the 6-digit code from your email'); return }
+    setLoading(true)
+
+    const { data: { session }, error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: otp.trim(),
+      type: 'email',
+    })
+
+    if (verifyError) { setLoading(false); setError(verifyError.message); return }
+    if (!session) { setLoading(false); setError('Sign-in failed — please try again'); return }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone, role')
+      .eq('id', session.user.id)
+      .single()
+
+    setLoading(false)
+
+    if (!profile?.full_name || !profile?.phone) {
+      setStep('profile')
+    } else {
+      router.replace(next === '/home' ? roleHome(profile.role) : next)
+      router.refresh()
     }
   }
 
@@ -224,40 +255,64 @@ export function LoginForm() {
     )
   }
 
-  // ── Step: link sent ───────────────────────────────────────────────────────
+  // ── Step: enter OTP code ─────────────────────────────────────────────────
   if (step === 'sent') {
     return (
       <div className="min-h-dvh bg-white flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <TopBar onBack={() => { setStep('email'); setError('') }} />
+        <TopBar onBack={() => { setStep('email'); setOtp(''); setError('') }} />
 
         <div className="flex-1 flex flex-col px-6 pt-6 pb-8 gap-6">
           <div className="flex flex-col gap-2">
-            <h1 className="font-heading font-extrabold text-[28px] text-ink">Check your email</h1>
+            <h1 className="font-heading font-extrabold text-[28px] text-ink">Enter your code</h1>
             <p className="text-[15px] text-ink-2 leading-relaxed">
-              We sent a sign-in link to{' '}
+              We sent a 6-digit code to{' '}
               <span className="font-semibold text-ink">{email}</span>.
-              Tap it and you&apos;ll be signed in automatically.
+              Open your email, copy the code, and paste it here.
             </p>
-            <p className="text-[14px] text-ink-2 mt-1">Not there? Check your spam folder.</p>
           </div>
 
-          {resendSeconds > 0 ? (
-            <p className="text-[15px] text-ink-2">
-              Resend in{' '}
-              <span className="font-semibold text-ink">
-                {Math.floor(resendSeconds / 60)}:{String(resendSeconds % 60).padStart(2, '0')}
-              </span>
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={sendLink}
-              disabled={loading}
-              className="text-[15px] font-semibold text-brand self-start disabled:opacity-60"
-            >
-              Resend link
-            </button>
-          )}
+          <div className="flex flex-col gap-4">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              autoComplete="one-time-code"
+              placeholder="000000"
+              value={otp}
+              onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && verifyCode()}
+              autoFocus
+              className="h-16 px-4 rounded-2xl border-2 border-line text-center text-[32px] font-heading font-bold tracking-[0.25em] text-ink outline-none focus:border-brand transition-colors"
+            />
+
+            {error && <p className="text-sm text-danger text-center">{error}</p>}
+
+            <Button onClick={verifyCode} loading={loading} fullWidth size="lg">
+              Verify code
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <p className="text-[13px] text-ink-2">Didn&apos;t get it? Check your spam folder.</p>
+            {resendSeconds > 0 ? (
+              <p className="text-[14px] text-ink-2">
+                Resend in{' '}
+                <span className="font-semibold text-ink">
+                  {Math.floor(resendSeconds / 60)}:{String(resendSeconds % 60).padStart(2, '0')}
+                </span>
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setOtp(''); setError(''); sendLink() }}
+                disabled={loading}
+                className="text-[14px] font-semibold text-brand self-start disabled:opacity-60"
+              >
+                Resend code
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
