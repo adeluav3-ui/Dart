@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X, Navigation } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { isInsideCoverage } from '@/lib/coverage'
-import type { CoverageArea } from '@/types/database'
+import type { Area, CoverageArea } from '@/types/database'
 
 interface Props {
   initialLat?: number
@@ -13,13 +13,36 @@ interface Props {
   onConfirm: (lat: number, lng: number, address: string) => void
   onClose: () => void
   coverageAreas?: CoverageArea[]
+  areas?: Area[]
 }
 
 // OOUTH Main Gate, Sagamu
 const DEFAULT_LAT = 6.7073
 const DEFAULT_LNG = 3.8858
 
-export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverageAreas }: Props) {
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * (Math.PI / 180)
+  const dLng = (lng2 - lng1) * (Math.PI / 180)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(a))
+}
+
+function nearestAreaName(lat: number, lng: number, areas: Area[]): string {
+  const candidates = areas.filter(a => a.lat != null && a.lng != null && a.is_active)
+  if (candidates.length === 0) return ''
+  const nearest = candidates.reduce((best, a) => {
+    const d = haversineM(lat, lng, a.lat!, a.lng!)
+    const bd = haversineM(lat, lng, best.lat!, best.lng!)
+    return d < bd ? a : best
+  })
+  return nearest.name
+}
+
+export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverageAreas, areas }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
 
@@ -27,10 +50,19 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
     lat: initialLat ?? DEFAULT_LAT,
     lng: initialLng ?? DEFAULT_LNG,
   })
+  const [areaLabel, setAreaLabel] = useState(() =>
+    areas && initialLat != null
+      ? nearestAreaName(initialLat, initialLng!, areas)
+      : ''
+  )
   const [locating, setLocating] = useState(false)
   const [outsideCoverage, setOutsideCoverage] = useState(false)
   const [autoLocating, setAutoLocating] = useState(initialLat == null)
   const [autoLocateError, setAutoLocateError] = useState('')
+
+  // Keep areas in a ref so the map event handler always sees latest value
+  const areasRef = useRef(areas)
+  useEffect(() => { areasRef.current = areas }, [areas])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -48,20 +80,23 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
 
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
       const tileUrl = mapboxToken
-        ? `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`
+        ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
       const attribution = mapboxToken
         ? '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
       L.tileLayer(tileUrl, { attribution, maxZoom: 22, tileSize: 512, zoomOffset: -1 }).addTo(map)
-
       L.control.zoom({ position: 'bottomright' }).addTo(map)
 
       map.on('move', () => {
+        if (!mounted) return
         const { lat, lng } = map.getCenter()
         setCenter({ lat, lng })
         setOutsideCoverage(false)
+        if (areasRef.current && areasRef.current.length > 0) {
+          setAreaLabel(nearestAreaName(lat, lng, areasRef.current))
+        }
       })
 
       mapRef.current = map
@@ -186,10 +221,20 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
         className="px-4 pt-3 pb-5 border-t border-line shrink-0"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
+        {/* Area label */}
+        {areaLabel ? (
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            <svg width="13" height="13" viewBox="0 0 36 50" fill="none">
+              <path d="M18 0C8.059 0 0 8.059 0 18C0 30 18 50 18 50C18 50 36 30 36 18C36 8.059 27.941 0 18 0Z" fill="#0B7A47"/>
+            </svg>
+            <span className="text-[14px] font-semibold text-ink">Near {areaLabel}</span>
+          </div>
+        ) : null}
+
         <p className="text-[13px] text-ink-2 text-center mb-3 leading-snug">
           {autoLocateError
             ? autoLocateError
-            : 'Is the pin on your exact spot? Drag the map to adjust, then confirm.'}
+            : 'Drag the map so the pin is on your exact spot, then confirm.'}
         </p>
 
         {outsideCoverage && (
@@ -203,7 +248,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, coverage
             const inside = isInsideCoverage(center.lat, center.lng, coverageAreas)
             if (!inside) { setOutsideCoverage(true); return }
           }
-          onConfirm(center.lat, center.lng, '')
+          onConfirm(center.lat, center.lng, areaLabel ? `Near ${areaLabel}` : '')
         }}>
           Confirm spot
         </Button>

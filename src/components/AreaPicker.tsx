@@ -135,6 +135,7 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
           onConfirm={handleMapConfirm}
           onClose={() => setShowMap(false)}
           coverageAreas={coverageAreas}
+          areas={areas}
         />
       </Suspense>
     )
