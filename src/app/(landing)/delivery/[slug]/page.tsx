@@ -1,10 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
 import { notFound } from 'next/navigation'
 import { MapPin, ChevronRight } from 'lucide-react'
 
 export const revalidate = 3600
+
+// Cookieless client — safe to use during static generation (no request context)
+function createPublicClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  )
+}
 
 function toSlug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -13,7 +22,7 @@ function toSlug(name: string) {
 type Props = { params: { slug: string } }
 
 async function getArea(slug: string) {
-  const supabase = createClient()
+  const supabase = createPublicClient()
   const { data: areas } = await supabase
     .from('areas')
     .select('id, name, status')
@@ -24,7 +33,7 @@ async function getArea(slug: string) {
 
 export async function generateStaticParams() {
   try {
-    const supabase = createClient()
+    const supabase = createPublicClient()
     const { data: areas } = await supabase
       .from('areas')
       .select('name')
