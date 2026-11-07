@@ -56,7 +56,18 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
     setSaving(false)
     if (error) { setPhoneError(error.message); return }
 
-    router.push(next || '/home')
+    // Route by role so admins/vendors/riders don't land on the customer home
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, roles')
+      .eq('id', user.id)
+      .single()
+
+    const roles: string[] = profile?.roles ?? (profile?.role ? [profile.role] : [])
+    if (roles.includes('admin'))       router.push('/admin')
+    else if (roles.includes('vendor')) router.push('/vendor')
+    else if (roles.includes('rider'))  router.push('/rider')
+    else                               router.push(next || '/home')
   }
 
   return (
