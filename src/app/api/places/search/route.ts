@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
     console.error('[places/search] no active areas with coordinates — bbox is null')
     return NextResponse.json({ unavailable: true })
   }
+  console.log('[places/search] key ok, bbox ok — calling Google Places API')
 
   try {
     const controller = new AbortController()
