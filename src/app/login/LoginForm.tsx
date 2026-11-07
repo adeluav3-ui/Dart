@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -30,7 +30,6 @@ export function LoginForm() {
   const [error, setError] = useState('')
   const [resendSeconds, setResendSeconds] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || searchParams.get('redirect') || '/home'
   const startComplete = searchParams.get('complete') === '1'
@@ -100,8 +99,7 @@ export function LoginForm() {
     if (!profile?.full_name || !profile?.phone) {
       setStep('profile')
     } else {
-      router.replace(next === '/home' ? roleHome(profile.role) : next)
-      router.refresh()
+      window.location.href = next === '/home' ? roleHome(profile.role) : next
     }
   }
 
@@ -130,8 +128,7 @@ export function LoginForm() {
       .eq('id', user.id)
       .single()
 
-    router.replace(next === '/home' ? roleHome(profile?.role) : next)
-    router.refresh()
+    window.location.href = next === '/home' ? roleHome(profile?.role) : next
   }
 
   async function signInWithGoogle() {
