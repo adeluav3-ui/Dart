@@ -128,15 +128,9 @@ export function AreaPicker({ areas, zones, selectedId, onSave, onClose, coverage
   const canContinue = !!selectedArea && selectedArea.lat != null && selectedArea.lng != null
 
   if (showMap) {
-    const currentPin = selectedArea
-      ? { lat: selectedArea.lat!, lng: selectedArea.lng! }
-      : undefined
-
     return (
       <Suspense fallback={null}>
         <MapPicker
-          initialLat={currentPin?.lat}
-          initialLng={currentPin?.lng}
           onConfirm={handleMapConfirm}
           onClose={() => setShowMap(false)}
           areas={areas}
