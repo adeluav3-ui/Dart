@@ -177,6 +177,13 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
           navigator.geolocation.getCurrentPosition(
             pos => {
               if (!mounted) return
+              // Reject IP-based geolocation — accuracy worse than 2 km means the browser
+              // is guessing from the network, not from GPS/WiFi. It can be 50+ km off.
+              if (pos.coords.accuracy > 2000) {
+                setAutoLocating(false)
+                setAutoLocateError("Couldn't detect your precise location — drag the map to your spot")
+                return
+              }
               map.setView([pos.coords.latitude, pos.coords.longitude], 17)
               if (pos.coords.accuracy > 100) {
                 accuracyCircleRef.current = L.circle(
@@ -219,6 +226,11 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     setAutoLocateError('')
     navigator.geolocation.getCurrentPosition(
       async pos => {
+        if (pos.coords.accuracy > 2000) {
+          setLocating(false)
+          setAutoLocateError("Couldn't detect your precise location — drag the map to your spot")
+          return
+        }
         const L = (await import('leaflet')).default
         if (mapRef.current) {
           mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 17)
