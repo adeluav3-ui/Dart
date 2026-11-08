@@ -2,10 +2,81 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { X, Phone, Info } from 'lucide-react'
+import { X, Phone, Info, Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime, formatMoney } from '@/lib/format'
 import type { OrderEvent, OrderItem, OrderStatus } from '@/types/database'
+import {
+  enablePush,
+  isPushSubscribed,
+  isPushSupported,
+  isIOS,
+  isIOSPushSupported,
+} from '@/lib/notifications/push'
+
+// ── One-time push opt-in card ─────────────────────────────────
+const PUSH_PROMPTED_KEY = 'gocart_push_prompted'
+
+function PushPromptCard() {
+  const [visible, setVisible] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(PUSH_PROMPTED_KEY)) return
+
+    const iosDevice = isIOS()
+    const supported = isPushSupported()
+    const iosPwa = isIOSPushSupported()
+
+    // Show only if push is usable (non-iOS, or iOS PWA)
+    const usable = supported && (!iosDevice || iosPwa)
+    if (!usable) return
+
+    isPushSubscribed().then(subscribed => {
+      if (!subscribed) setVisible(true)
+    })
+  }, [])
+
+  if (!visible) return null
+
+  async function handleEnable() {
+    setLoading(true)
+    await enablePush()
+    localStorage.setItem(PUSH_PROMPTED_KEY, '1')
+    setVisible(false)
+  }
+
+  function handleDismiss() {
+    localStorage.setItem(PUSH_PROMPTED_KEY, '1')
+    setVisible(false)
+  }
+
+  return (
+    <div className="mx-4 mt-3.5 bg-brand-tint rounded-2xl px-4 py-3.5 flex items-center gap-3">
+      <Bell size={19} className="text-brand shrink-0" strokeWidth={2} />
+      <span className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className="text-[14px] font-semibold text-ink">Get live updates</span>
+        <span className="text-[12px] text-ink-2 leading-snug">We&apos;ll notify you when your rider picks up</span>
+      </span>
+      <button
+        type="button"
+        onClick={handleEnable}
+        disabled={loading}
+        className="shrink-0 h-9 px-4 rounded-xl bg-brand text-white text-[13px] font-bold disabled:opacity-60"
+      >
+        {loading ? '…' : 'Turn on'}
+      </button>
+      <button
+        type="button"
+        onClick={handleDismiss}
+        aria-label="Dismiss"
+        className="shrink-0 w-7 h-7 flex items-center justify-center text-ink-2 -mr-1"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  )
+}
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending_payment: 'Awaiting payment',
@@ -257,6 +328,9 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
           </span>
         )}
       </div>
+
+      {/* ── Push opt-in prompt — shown once on active orders ── */}
+      {isActive && <PushPromptCard />}
 
       {/* ── Delivery PIN card ── */}
       {(status === 'picked_up' || status === 'ready') && deliveryPin && (
