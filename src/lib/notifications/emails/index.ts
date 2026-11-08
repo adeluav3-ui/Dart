@@ -6,6 +6,7 @@ import { renderCancelledRefund } from './cancelled_refund'
 import { renderNoShow } from './no_show'
 import { renderVendorMissed } from './vendor_missed'
 import { renderPayout } from './payout'
+import { renderWelcome } from './welcome'
 import { renderApproved } from './approved'
 import { renderRiderApproved } from './rider_approved'
 import { renderAdminAlert } from './admin_alert'
@@ -24,6 +25,7 @@ const renderers: Record<string, Renderer> = {
   no_show:                renderNoShow,
   vendor_missed:          renderVendorMissed,
   payout:                 renderPayout,
+  welcome:                renderWelcome,
   approved:               renderApproved,
   rider_approved:         renderRiderApproved,
   admin_alert:            renderAdminAlert,
