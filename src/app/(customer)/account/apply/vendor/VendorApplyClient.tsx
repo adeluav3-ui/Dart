@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +13,8 @@ interface Props {
   userId: string
 }
 
+const LS_DRAFT_KEY = 'dart_sell_draft'
+
 export function VendorApplyClient({ areas, userId }: Props) {
   const [bizName, setBizName] = useState('')
   const [storeType, setStoreType] = useState<'restaurant' | 'supermarket' | 'pharmacy'>('restaurant')
@@ -24,6 +26,21 @@ export function VendorApplyClient({ areas, userId }: Props) {
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+
+  // Restore draft saved by /sell (unauthenticated pre-fill flow)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_DRAFT_KEY)
+      if (!saved) return
+      const d = JSON.parse(saved)
+      if (d.bizName)   setBizName(d.bizName)
+      if (d.storeType) setStoreType(d.storeType)
+      if (d.areaId)    setAreaId(d.areaId)
+      if (d.landmark)  setLandmark(d.landmark)
+      if (d.rawPhone)  setRawPhone(d.rawPhone)
+      localStorage.removeItem(LS_DRAFT_KEY)
+    } catch { /* ignore */ }
+  }, [])
 
   async function submit() {
     setError('')

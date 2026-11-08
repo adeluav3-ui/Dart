@@ -7,6 +7,7 @@ import { renderNoShow } from './no_show'
 import { renderVendorMissed } from './vendor_missed'
 import { renderPayout } from './payout'
 import { renderApproved } from './approved'
+import { renderRiderApproved } from './rider_approved'
 import { renderAdminAlert } from './admin_alert'
 import { renderAdminPaymentIssue } from './admin_payment_issue'
 import { renderAdminNewApplication } from './admin_new_application'
@@ -24,6 +25,7 @@ const renderers: Record<string, Renderer> = {
   vendor_missed:          renderVendorMissed,
   payout:                 renderPayout,
   approved:               renderApproved,
+  rider_approved:         renderRiderApproved,
   admin_alert:            renderAdminAlert,
   admin_payment_issue:    renderAdminPaymentIssue,
   admin_new_application:  renderAdminNewApplication,

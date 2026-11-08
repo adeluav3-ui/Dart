@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendVendorApprovedEmail, sendRiderApprovedEmail } from '@/lib/email'
 
 export async function POST(
   _req: NextRequest,
@@ -78,14 +77,46 @@ export async function POST(
     .eq('id', params.id)
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  // Email the applicant
+  // Email the applicant via notification system
   const { data: authUser } = await admin.auth.admin.getUserById(app.user_id)
   const email = authUser.user?.email
+  const ownerName = targetProfile?.full_name ?? ''
+
   if (email) {
     if (app.kind === 'vendor') {
-      await sendVendorApprovedEmail({ to: email, name: targetProfile?.full_name ?? email }).catch(() => null)
+      const appData = app.data as Record<string, unknown>
+      const vendorName = String(appData.business_name ?? 'Your store')
+      await admin.rpc('enqueue_notification', {
+        p_event: 'vendor_approved',
+        p_order_id: null,
+        p_recipient_user_id: app.user_id,
+        p_recipient_email: email,
+        p_recipient_role: 'vendor',
+        p_channel: 'email',
+        p_title: "You're live on GoCart!",
+        p_body: `${vendorName} has been approved. Go set up your menu and open your store.`,
+        p_url: '/vendor',
+        p_email_subject: `${vendorName} is live on GoCart!`,
+        p_email_template: 'approved',
+        p_payload: { vendor_name: vendorName, owner_name: ownerName },
+        p_dedupe_key: `vendor_approved:${app.user_id}`,
+      }).then(() => null, () => null)
     } else {
-      await sendRiderApprovedEmail({ to: email, name: targetProfile?.full_name ?? email }).catch(() => null)
+      await admin.rpc('enqueue_notification', {
+        p_event: 'rider_approved',
+        p_order_id: null,
+        p_recipient_user_id: app.user_id,
+        p_recipient_email: email,
+        p_recipient_role: 'rider',
+        p_channel: 'email',
+        p_title: "You're a GoCart rider!",
+        p_body: 'Your rider application has been approved. Open the app to start receiving jobs.',
+        p_url: '/rider',
+        p_email_subject: "You're approved — welcome to GoCart",
+        p_email_template: 'rider_approved',
+        p_payload: { rider_name: ownerName },
+        p_dedupe_key: `rider_approved:${app.user_id}`,
+      }).then(() => null, () => null)
     }
   }
 
