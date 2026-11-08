@@ -39,33 +39,6 @@ async function sendEmail(to: string, subject: string, html: string, text: string
   })
 }
 
-// ── Termii (SMS) ──────────────────────────────────────────────────────────────
-const TERMII_API_KEY = process.env.TERMII_API_KEY ?? ''
-const TERMII_SENDER_ID = process.env.TERMII_SENDER_ID ?? 'GoCart'
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  if (digits.startsWith('234')) return digits
-  if (digits.startsWith('0') && digits.length === 11) return '234' + digits.slice(1)
-  if (digits.length === 10) return '234' + digits
-  return digits
-}
-
-async function sendSms(to: string, message: string): Promise<void> {
-  if (!TERMII_API_KEY) return
-  await fetch('https://api.ng.termii.com/api/sms/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_key: TERMII_API_KEY,
-      to,
-      from: TERMII_SENDER_ID,
-      sms: message,
-      type: 'plain',
-      channel: 'generic',
-    }),
-  })
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Notification {
@@ -248,38 +221,6 @@ async function dispatchOne(n: Notification): Promise<void> {
         await sendEmail(to, subject, html, text)
       }
 
-      await supabaseAdmin
-        .from('notifications')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
-        .eq('id', n.id)
-
-    } else if (n.channel === 'sms') {
-      if (!n.recipient_user_id) {
-        await supabaseAdmin
-          .from('notifications')
-          .update({ status: 'skipped', last_error: 'no_recipient_user' })
-          .eq('id', n.id)
-        return
-      }
-
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('phone')
-        .eq('id', n.recipient_user_id)
-        .single()
-
-      const rawPhone = profile?.phone ?? ''
-      const phone = normalizePhone(rawPhone)
-
-      if (!phone || phone.length < 11) {
-        await supabaseAdmin
-          .from('notifications')
-          .update({ status: 'skipped', last_error: 'no_phone' })
-          .eq('id', n.id)
-        return
-      }
-
-      await sendSms(phone, n.body ?? '')
       await supabaseAdmin
         .from('notifications')
         .update({ status: 'sent', sent_at: new Date().toISOString() })

@@ -83,17 +83,5 @@ export async function POST(
     p_dedupe_key: `at_gate_push:${order.id}`,
   })
 
-  // at_gate SMS — highest urgency, customer may not see push
-  await admin.rpc('enqueue_notification', {
-    p_event: 'at_gate',
-    p_order_id: order.id,
-    p_recipient_user_id: order.customer_id,
-    p_recipient_role: 'customer',
-    p_channel: 'sms',
-    p_title: 'Rider at gate',
-    p_body: `GoCart: Your rider is at the OOUTH gate with order ${order.code}. Come out now! PIN: ${order.delivery_pin ?? '----'}`,
-    p_dedupe_key: `at_gate_sms:${order.id}`,
-  })
-
   return NextResponse.json({ ok: true })
 }
