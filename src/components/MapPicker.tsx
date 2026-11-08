@@ -191,13 +191,12 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
               if (!mounted) return
               setAutoLocating(false)
               setAutoLocateError("Couldn't detect your location — drag the map to your spot")
-              scheduleReverseGeocode(DEFAULT_LAT, DEFAULT_LNG)
             },
             { timeout: 10000, enableHighAccuracy: true }
           )
         } else {
           setAutoLocating(false)
-          scheduleReverseGeocode(DEFAULT_LAT, DEFAULT_LNG)
+          setAutoLocateError("Location not supported in this browser — drag the map to your spot")
         }
       } else {
         scheduleReverseGeocode(initialLat, initialLng!)
@@ -233,7 +232,7 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
         }
         setLocating(false)
       },
-      () => setLocating(false),
+      () => { setLocating(false); setAutoLocateError("Couldn't detect your location — drag the map to your spot") },
       { timeout: 8000, enableHighAccuracy: true }
     )
   }
