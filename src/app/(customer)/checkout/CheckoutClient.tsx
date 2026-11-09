@@ -36,11 +36,12 @@ interface Props {
   areas: Area[]
   feeSettings: ServiceFeeSettings
   coverageAreas?: unknown[]
+  walletBalance?: number
 }
 
 const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
 
-export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
+export function CheckoutClient({ userId, zones, areas, feeSettings, walletBalance = 0 }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
@@ -107,7 +108,10 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
   const selectedArea = pin?.areaId ? areas.find(a => a.id === pin.areaId) : null
   const isGatePickup = selectedArea?.gate_pickup ?? false
   const serviceFee = calcServiceFee(subtotal, feeSettings)
-  const total = subtotal + deliveryFee + serviceFee
+  const rawTotal = subtotal + deliveryFee + serviceFee
+  const walletApplied = Math.min(walletBalance, rawTotal)
+  const total = rawTotal - walletApplied
+  const isFullyFreeWithWallet = walletApplied > 0 && total === 0
 
   function savePin(areaId: string | null, areaName: string, lat: number, lng: number, description: string, label?: string) {
     const newPin: DeliveryPin = { areaId, areaName, lat, lng, description, label }
@@ -144,12 +148,18 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
           landmark: landmark.trim(),
           details: details.trim() || null,
           phone: phone.trim(),
+          useWallet: walletBalance > 0,
         }),
       })
 
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
-      if (json.checkoutUrl) { clearCart(); window.location.href = json.checkoutUrl }
+      clearCart()
+      if (json.checkoutUrl) {
+        window.location.href = json.checkoutUrl
+      } else if (json.paid && json.orderId) {
+        router.push(`/track/${json.orderId}`)
+      }
     } finally {
       setLoading(false)
       submittingRef.current = false
@@ -311,6 +321,12 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
               Helps us run GoCart: payments, support and refunds.
             </p>
           )}
+          {walletApplied > 0 && (
+            <div className="flex justify-between text-sm items-center">
+              <span className="text-brand font-semibold">GoCart credit</span>
+              <span className="text-brand font-semibold">−{formatMoney(walletApplied)}</span>
+            </div>
+          )}
           <div className="h-px bg-line my-1" />
           <div className="flex justify-between text-base font-bold">
             <span>Total</span>
@@ -334,7 +350,7 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
           fullWidth
           size="lg"
         >
-          Pay {formatMoney(total)}
+          {isFullyFreeWithWallet ? 'Place order — free with credit' : `Pay ${formatMoney(total)}`}
         </Button>
         <p className="text-[12px] text-ink-2 text-center leading-relaxed">
           By paying you agree to the{' '}

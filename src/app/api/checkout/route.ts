@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       landmark,
       details,
       phone,
+      useWallet = false,
     }: {
       cart: Cart
       areaId: string | null
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
       landmark: string
       details: string | null
       phone: string
+      useWallet?: boolean
     } = body
 
     if (!cart || !cart.items.length) {
@@ -187,8 +189,26 @@ export async function POST(req: NextRequest) {
     const { okada_fare, rider_pay, delivery_fee: platformDeliveryCost } = calcDeliveryPrice(distance_m, settings)
 
     const serviceFee = calcServiceFee(subtotal, feeSettings)
-    const total = subtotal + okada_fare + serviceFee
+    const rawTotal = subtotal + okada_fare + serviceFee
     const commissionAmount = Math.round(subtotal * vendor.commission_rate)
+
+    // Compute wallet balance from ledger (only if client requested it)
+    let walletApplied = 0
+    if (useWallet) {
+      const { data: ledger } = await admin
+        .from('ledger_entries')
+        .select('amount, kind')
+        .eq('party_id', user.id)
+        .eq('party_type', 'customer')
+      const walletBalance = Math.max(0, (ledger ?? []).reduce((sum: number, e: { amount: number; kind: string }) => {
+        if (e.kind === 'refund' || e.kind === 'topup') return sum + e.amount
+        if (e.kind === 'payout' || e.kind === 'adjustment') return sum - e.amount
+        return sum
+      }, 0))
+      walletApplied = Math.min(walletBalance, rawTotal)
+    }
+
+    const total = rawTotal - walletApplied
 
     // 6. Generate delivery PIN and order code
     const deliveryPin = String(Math.floor(1000 + Math.random() * 9000))
@@ -229,6 +249,7 @@ export async function POST(req: NextRequest) {
         okada_fare_kobo: okada_fare,
         rider_pay_kobo: rider_pay,
         delivery_fee_kobo: platformDeliveryCost,
+        wallet_applied_kobo: walletApplied,
         pricing_snapshot: {
           base_fare_kobo: settings.base_fare_kobo,
           per_km_kobo: settings.per_km_kobo,
@@ -263,15 +284,44 @@ export async function POST(req: NextRequest) {
       note: 'Order created',
     })
 
-    // 10. Init Monnify payment
+    // 10. Apply wallet credit and decide payment path
+
+    // Full wallet coverage — no Monnify needed
+    if (walletApplied > 0 && total === 0) {
+      await admin.from('ledger_entries').insert({
+        order_id: order.id,
+        party_type: 'customer',
+        party_id: user.id,
+        amount: walletApplied,
+        kind: 'adjustment',
+        note: 'Wallet credit applied at checkout',
+      })
+      await admin.from('payments').insert({
+        order_id: order.id,
+        reference: `GCW-FULL-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+        provider: 'wallet',
+        amount: 0,
+        status: 'paid',
+        type: 'order',
+      })
+      await admin.rpc('transition_order', {
+        p_order_id: order.id,
+        p_to_status: 'paid',
+        p_note: 'Paid in full with GoCart wallet credit',
+      })
+      return NextResponse.json({ orderId: order.id, orderCode: order.code, paid: true })
+    }
+
+    // Partial wallet or no wallet — pay via Monnify
     const reference = `GC-${order.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
 
     await admin.from('payments').insert({
       order_id: order.id,
       reference,
       provider: 'monnify',
-      amount: total,
+      amount: total,  // reduced amount after wallet deduction
       status: 'pending',
+      type: 'order',
     })
 
     const monnifyRes = await initMonnifyTransaction({

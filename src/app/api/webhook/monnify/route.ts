@@ -57,13 +57,28 @@ export async function POST(req: NextRequest) {
     // 4. Mark payment as paid
     await admin
       .from('payments')
-      .update({
-        status: 'paid',
-        raw_webhook: body,
-      })
+      .update({ status: 'paid', raw_webhook: body })
       .eq('reference', paymentReference)
 
-    // 5. Transition order to paid (uses the Postgres state machine function)
+    // 5a. Wallet top-up — credit the customer ledger
+    if ((payment as { type?: string }).type === 'wallet_topup') {
+      const topupUserId = (payment as { topup_user_id?: string }).topup_user_id
+      if (!topupUserId) {
+        console.error('Webhook: wallet_topup payment missing topup_user_id', paymentReference)
+        return NextResponse.json({ received: true })
+      }
+      await admin.from('ledger_entries').insert({
+        order_id: null,
+        party_type: 'customer',
+        party_id: topupUserId,
+        amount: payment.amount,
+        kind: 'topup',
+        note: `Wallet top-up · ${transactionReference}`,
+      })
+      return NextResponse.json({ received: true })
+    }
+
+    // 5b. Order payment — transition order to paid
     const order = payment.orders as { id: string; status: string }
     if (order.status !== 'pending_payment') {
       // Already moved on
@@ -75,6 +90,23 @@ export async function POST(req: NextRequest) {
       p_to_status: 'paid',
       p_note: `Monnify: ${transactionReference}`,
     })
+
+    // If there was a partial wallet deduction recorded on the order, apply it now
+    const walletApplied = (order as { wallet_applied_kobo?: number }).wallet_applied_kobo ?? 0
+    if (walletApplied > 0) {
+      const { data: orderRow } = await admin
+        .from('orders').select('customer_id').eq('id', order.id).single()
+      if (orderRow) {
+        await admin.from('ledger_entries').insert({
+          order_id: order.id,
+          party_type: 'customer',
+          party_id: (orderRow as { customer_id: string }).customer_id,
+          amount: walletApplied,
+          kind: 'adjustment',
+          note: 'Wallet credit applied at checkout',
+        })
+      }
+    }
 
     // Notifications (receipt email + vendor push) are sent by the
     // _notify_on_order_event trigger inside transition_order above.

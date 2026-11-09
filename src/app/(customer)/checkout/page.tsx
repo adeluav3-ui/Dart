@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { CheckoutClient } from './CheckoutClient'
 import { parseServiceFeeSettings } from '@/lib/serviceFee'
-import type { Zone, Area, CoverageArea } from '@/types/database'
+import type { Zone, Area, CoverageArea, LedgerEntry } from '@/types/database'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 export default async function CheckoutPage() {
   const supabase = createClient()
@@ -27,6 +27,21 @@ export default async function CheckoutPage() {
 
   const feeSettings = parseServiceFeeSettings(feeRows ?? [])
 
+  let walletBalance = 0
+  if (user) {
+    const { data: ledger } = await supabase
+      .from('ledger_entries')
+      .select('amount, kind')
+      .eq('party_id', user.id)
+      .eq('party_type', 'customer')
+    const entries = (ledger as Pick<LedgerEntry, 'amount' | 'kind'>[]) ?? []
+    walletBalance = Math.max(0, entries.reduce((sum, e) => {
+      if (e.kind === 'refund' || e.kind === 'topup') return sum + e.amount
+      if (e.kind === 'payout' || e.kind === 'adjustment') return sum - e.amount
+      return sum
+    }, 0))
+  }
+
   return (
     <CheckoutClient
       userId={user?.id ?? null}
@@ -34,6 +49,7 @@ export default async function CheckoutPage() {
       areas={(areas as Area[]) ?? []}
       feeSettings={feeSettings}
       coverageAreas={(coverageAreas as CoverageArea[]) ?? []}
+      walletBalance={walletBalance}
     />
   )
 }

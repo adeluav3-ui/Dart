@@ -10,7 +10,7 @@ export type OrderStatus =
   | 'cancelled'
   | 'expired'
 export type LedgerParty = 'vendor' | 'rider' | 'platform' | 'customer'
-export type LedgerKind = 'earning' | 'payout' | 'refund' | 'adjustment'
+export type LedgerKind = 'earning' | 'payout' | 'refund' | 'adjustment' | 'topup'
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 
 export interface Profile {
@@ -346,6 +346,7 @@ export interface Order {
   rider_pay_kobo: number | null
   delivery_fee_kobo: number | null
   pricing_snapshot: Record<string, unknown> | null
+  wallet_applied_kobo: number
 }
 
 export interface OrderItem {
@@ -378,18 +379,20 @@ export interface OrderEvent {
 
 export interface Payment {
   id: string
-  order_id: string
+  order_id: string | null
   reference: string
   provider: string
   amount: number
   status: PaymentStatus
+  type: 'order' | 'wallet_topup'
+  topup_user_id: string | null
   raw_webhook: Record<string, unknown> | null
   created_at: string
 }
 
 export interface LedgerEntry {
   id: string
-  order_id: string
+  order_id: string | null
   party_type: LedgerParty
   party_id: string | null
   amount: number

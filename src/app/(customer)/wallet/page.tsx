@@ -11,9 +11,14 @@ type LedgerWithOrder = LedgerEntry & {
   }) | null
 }
 
-export default async function WalletPage() {
+export default async function WalletPage({
+  searchParams,
+}: {
+  searchParams: { topup?: string }
+}) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const topupSuccess = searchParams.topup === '1'
 
   if (!user) {
     return (
@@ -55,10 +60,10 @@ export default async function WalletPage() {
   const entries = (ledger as LedgerWithOrder[]) ?? []
 
   const balance = entries.reduce((sum, e) => {
-    if (e.kind === 'refund') return sum + e.amount
+    if (e.kind === 'refund' || e.kind === 'topup') return sum + e.amount
     if (e.kind === 'payout' || e.kind === 'adjustment') return sum - e.amount
     return sum
   }, 0)
 
-  return <WalletClient balance={balance} entries={entries} />
+  return <WalletClient balance={Math.max(0, balance)} entries={entries} topupSuccess={topupSuccess} />
 }
