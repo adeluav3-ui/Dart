@@ -2,6 +2,7 @@ import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { renderTemplate } from '@/lib/notifications/emails'
 
 export async function POST(req: NextRequest) {
   // Admin-only
@@ -22,12 +23,21 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Get the admin's email for email-channel tests
+  // Get the admin's email
   const { data: authUser } = await admin.auth.admin.getUserById(user.id)
   const adminEmail = authUser.user?.email ?? null
 
-  // Enqueue directly (bypass enqueue_notification to avoid Vault dependency in test)
-  const { data: row, error } = await admin
+  // Check env vars before even inserting
+  const resendKey = process.env.RESEND_API_KEY
+  const fromEmail = process.env.EMAIL_FROM
+  if (channel === 'email') {
+    if (!resendKey) return NextResponse.json({ error: 'RESEND_API_KEY is not set in Vercel env vars' }, { status: 500 })
+    if (!fromEmail) return NextResponse.json({ error: 'EMAIL_FROM is not set in Vercel env vars' }, { status: 500 })
+    if (!adminEmail) return NextResponse.json({ error: 'Admin account has no email address' }, { status: 500 })
+  }
+
+  // Insert notification
+  const { data: row, error: insertErr } = await admin
     .from('notifications')
     .insert({
       event,
@@ -47,32 +57,50 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
 
-  if (error || !row) {
-    return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 })
+  if (insertErr || !row) {
+    return NextResponse.json({ error: insertErr?.message ?? 'Insert failed' }, { status: 500 })
   }
 
-  // Kick dispatcher
-  const dispatchUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/internal/notifications/dispatch`
-  const dispatchRes = await fetch(dispatchUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-dispatch-secret': process.env.INTERNAL_DISPATCH_SECRET ?? '',
-    },
-    body: JSON.stringify({ id: row.id }),
-  }).catch((err: unknown) => ({ ok: false, status: 0, json: async () => ({ error: String(err) }) } as Response))
+  // Dispatch inline — no HTTP hop
+  if (channel === 'email') {
+    const subject = payload?.email_subject ?? `Test: ${event}`
+    const template = payload?.email_template as string | undefined
+    const rendered = template ? renderTemplate(template, payload ?? {}) : null
+    const html = rendered?.html ?? `<p>${payload?.body ?? 'Test notification'}</p>`
+    const text = rendered?.text ?? (payload?.body as string ?? 'Test notification')
 
-  if (!dispatchRes.ok) {
-    const dispatchBody = await dispatchRes.json().catch(() => ({}))
-    return NextResponse.json({
-      ok: false,
-      id: row.id,
-      dispatch_status: dispatchRes.status,
-      dispatch_error: dispatchBody,
-      hint: dispatchRes.status === 403
-        ? 'INTERNAL_DISPATCH_SECRET is not set or does not match in Vercel env vars'
-        : 'Dispatcher returned an error',
-    }, { status: 500 })
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({ from: fromEmail, to: adminEmail, subject, html, text }),
+    })
+
+    if (!resendRes.ok) {
+      const resendBody = await resendRes.text().catch(() => '')
+      await admin.from('notifications')
+        .update({ status: 'failed', last_error: `Resend ${resendRes.status}: ${resendBody}`, attempts: 1 })
+        .eq('id', row.id)
+      return NextResponse.json({
+        ok: false,
+        id: row.id,
+        error: `Resend rejected the email: ${resendRes.status}`,
+        detail: resendBody,
+        hint: resendRes.status === 403
+          ? 'Domain not verified in Resend, or API key lacks send permissions'
+          : resendRes.status === 422
+          ? 'EMAIL_FROM address/domain is not verified in Resend'
+          : 'Check Resend dashboard for details',
+      }, { status: 500 })
+    }
+
+    await admin.from('notifications')
+      .update({ status: 'sent', sent_at: new Date().toISOString(), attempts: 1 })
+      .eq('id', row.id)
+
+    return NextResponse.json({ ok: true, id: row.id, sent_to: adminEmail })
   }
 
   return NextResponse.json({ ok: true, id: row.id })
