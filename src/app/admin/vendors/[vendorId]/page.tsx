@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { VendorDetailClient } from './VendorDetailClient'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminVendorDetailPage({ params }: { params: { vendorId: string } }) {
   const supabase = createClient()

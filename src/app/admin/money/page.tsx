@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/format'
 import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminMoneyPage() {
   const supabase = createClient()
@@ -71,7 +73,7 @@ export default async function AdminMoneyPage() {
                 {(e as { profiles?: { full_name?: string; phone?: string } }).profiles?.full_name
                   ?? (e as { profiles?: { phone?: string } }).profiles?.phone}
               </span>
-              <span className="text-xs text-ink-2">{formatDate(e.settled_at!)} · {(e as { orders?: { code?: string } }).orders?.code}</span>
+              <span className="text-xs text-ink-2">{formatDate(e.settled_at!)} Â· {(e as { orders?: { code?: string } }).orders?.code}</span>
             </span>
             <span className="font-bold text-brand">{formatMoney(e.amount)}</span>
           </div>

@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/format'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminMetricsPage() {
   const supabase = createClient()
@@ -58,13 +60,13 @@ export default async function AdminMetricsPage() {
         <Stat label="Cancelled/expired today" value={String(cancelled?.length ?? 0)} />
         <Stat
           label="Avg rider pickup distance"
-          value={avgPickupM != null ? (avgPickupM >= 1000 ? `${(avgPickupM / 1000).toFixed(1)} km` : `${avgPickupM} m`) : '—'}
+          value={avgPickupM != null ? (avgPickupM >= 1000 ? `${(avgPickupM / 1000).toFixed(1)} km` : `${avgPickupM} m`) : 'â€”'}
           sub={pickupDistances.length > 0 ? `${pickupDistances.length} order${pickupDistances.length !== 1 ? 's' : ''} today` : 'No data yet'}
         />
       </div>
 
       <div className="bg-brand-tint rounded-2xl p-4 text-sm text-brand-ink">
-        <b>Pilot gate:</b> aim for 30–50 orders/day over 4 weeks, positive margin on every order, and a healthy reorder rate before moving to v2.
+        <b>Pilot gate:</b> aim for 30â€“50 orders/day over 4 weeks, positive margin on every order, and a healthy reorder rate before moving to v2.
       </div>
     </div>
   )

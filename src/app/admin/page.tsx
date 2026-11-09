@@ -1,8 +1,10 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminLiveBoardClient } from './AdminLiveBoardClient'
 import { STALE_MS } from '@/lib/geo'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminLivePage() {
   const supabase = createClient()
@@ -75,9 +77,9 @@ export default async function AdminLivePage() {
           className="flex items-center justify-between mb-4 px-4 py-3 rounded-2xl bg-warn-tint border border-warn/20 no-underline"
         >
           <span className="text-sm font-semibold text-warn">
-            {unpinnedCount} {unpinnedCount === 1 ? 'area has' : 'areas have'} no GPS pin — &quot;Use my location&quot; won&apos;t work for them
+            {unpinnedCount} {unpinnedCount === 1 ? 'area has' : 'areas have'} no GPS pin â€” &quot;Use my location&quot; won&apos;t work for them
           </span>
-          <span className="text-sm font-bold text-warn shrink-0 ml-3">Set pins →</span>
+          <span className="text-sm font-bold text-warn shrink-0 ml-3">Set pins â†’</span>
         </Link>
       )}
       <AdminLiveBoardClient

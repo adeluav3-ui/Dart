@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import type { Vendor } from '@/types/database'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminVendorsPage() {
   const supabase = createClient()
@@ -32,9 +34,9 @@ export default async function AdminVendorsPage() {
               {vendor.is_verified ? 'Verified' : 'Not verified'}
             </span>
           </div>
-          <span className="text-sm text-ink-2">{vendor.type} · {vendor.category}</span>
+          <span className="text-sm text-ink-2">{vendor.type} Â· {vendor.category}</span>
           <span className="text-sm text-ink-2">
-            Commission: {(vendor.commission_rate * 100).toFixed(0)}% ·
+            Commission: {(vendor.commission_rate * 100).toFixed(0)}% Â·
             {vendor.is_open ? ' Open' : ' Closed'}
           </span>
         </Link>

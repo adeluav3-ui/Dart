@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
 
 export default function NewVendorPage() {
   const [form, setForm] = useState({
@@ -95,7 +97,7 @@ export default function NewVendorPage() {
   return (
     <div className="max-w-lg mx-auto flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Link href="/admin/vendors" className="text-brand text-sm font-semibold">← Back</Link>
+        <Link href="/admin/vendors" className="text-brand text-sm font-semibold">â† Back</Link>
         <h2 className="font-heading font-bold text-xl">New vendor</h2>
       </div>
 
@@ -178,7 +180,7 @@ export default function NewVendorPage() {
             onChange={e => setForm(p => ({ ...p, zone_id: e.target.value }))}
             className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px]"
           >
-            <option value="">— Select zone —</option>
+            <option value="">â€” Select zone â€”</option>
             {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
           </select>
         </label>

@@ -2,6 +2,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ApplicationsClient } from './ApplicationsClient'
 import type { ApplicationKind, ApplicationStatus } from '@/types/database'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminApplicationsPage() {
   const admin = createAdminClient()
 

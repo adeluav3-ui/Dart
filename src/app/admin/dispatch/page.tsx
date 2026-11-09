@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { DispatchClient } from './DispatchClient'
+
+export const dynamic = 'force-dynamic'
 
 export default async function DispatchPage() {
   const supabase = createClient()
