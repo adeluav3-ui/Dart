@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck } from 'lucide-react'
+import { Search, MapPin, ChevronDown, ShoppingCart, Clock, ShieldCheck, User } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge'
 import { AreaPicker } from '@/components/AreaPicker'
@@ -135,17 +135,28 @@ export function HomeClient({ userId, vendors, zones, areas, pricingSettings }: P
           style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}
         >
           <Logo height={28} />
-          <Link
-            href="/checkout"
-            className="relative w-11 h-11 rounded-full border border-line bg-white flex items-center justify-center"
-          >
-            <ShoppingCart size={20} />
-            {itemCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
-                {itemCount}
-              </span>
+          <div className="flex items-center gap-2">
+            {!userId && (
+              <Link
+                href="/login"
+                className="h-9 px-4 rounded-full bg-brand text-white text-[13px] font-bold flex items-center gap-1.5"
+              >
+                <User size={14} strokeWidth={2.2} />
+                Sign in
+              </Link>
             )}
-          </Link>
+            <Link
+              href="/checkout"
+              className="relative w-11 h-11 rounded-full border border-line bg-white flex items-center justify-center"
+            >
+              <ShoppingCart size={20} />
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
 
         {/* Deliver-to button */}

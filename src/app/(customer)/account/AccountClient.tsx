@@ -45,7 +45,7 @@ export function AccountClient({ profile, email, applications, userId, version }:
 
   async function signOut() {
     await supabase.auth.signOut()
-    window.location.href = '/'
+    window.location.href = '/start'
   }
 
   async function deleteAccount() {
@@ -56,7 +56,7 @@ export function AccountClient({ profile, email, applications, userId, version }:
       body: 'User requested account deletion via the app.',
     })
     await supabase.auth.signOut()
-    window.location.href = '/'
+    window.location.href = '/start'
   }
 
   return (

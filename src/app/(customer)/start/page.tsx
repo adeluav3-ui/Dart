@@ -23,13 +23,13 @@ export default function StartPage() {
         if (user) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('roles')
             .eq('id', user.id)
             .single()
-          const role = profile?.role
-          if (role === 'vendor') return '/vendor'
-          if (role === 'rider') return '/rider'
-          if (role === 'admin') return '/admin'
+          const roles: string[] = profile?.roles ?? []
+          if (roles.includes('admin'))  return '/admin'
+          if (roles.includes('vendor')) return '/vendor'
+          if (roles.includes('rider'))  return '/rider'
         }
       } catch { /* not logged in */ }
 

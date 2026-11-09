@@ -97,7 +97,7 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
         <p className="text-ink-2">Your cart is empty</p>
-        <Link href="/" className="text-brand font-semibold underline">Back to home</Link>
+        <Link href="/home" className="text-brand font-semibold underline">Back to home</Link>
       </div>
     )
   }
@@ -181,7 +181,7 @@ export function CheckoutClient({ userId, zones, areas, feeSettings }: Props) {
                     className="text-[13px] text-ink-2 bg-transparent border-0 cursor-pointer p-0">
                     Cancel
                   </button>
-                  <button type="button" onClick={() => { clearCart(); router.push('/') }}
+                  <button type="button" onClick={() => { clearCart(); router.push('/home') }}
                     className="text-[13px] font-semibold text-danger bg-transparent border-0 cursor-pointer p-0">
                     Clear cart
                   </button>

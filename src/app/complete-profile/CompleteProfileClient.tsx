@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { normalizePhone, validatePhone } from '@/lib/phone'
@@ -20,6 +20,17 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // Pre-fill phone from vendor application draft if present
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('dart_sell_draft')
+      if (!saved) return
+      const d = JSON.parse(saved)
+      if (d.rawPhone && !phone) setPhone(d.rawPhone)
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handlePhoneChange(raw: string) {
     // Strip the +234 prefix if user types it (we show it fixed in the UI)
