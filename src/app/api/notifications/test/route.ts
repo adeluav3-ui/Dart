@@ -22,12 +22,18 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Get the admin's email for email-channel tests
+  const { data: authUser } = await admin.auth.admin.getUserById(user.id)
+  const adminEmail = authUser.user?.email ?? null
+
   // Enqueue directly (bypass enqueue_notification to avoid Vault dependency in test)
   const { data: row, error } = await admin
     .from('notifications')
     .insert({
       event,
       recipient_user_id: user.id,
+      recipient_email: channel === 'email' ? adminEmail : null,
+      recipient_role: 'admin',
       channel,
       title: payload?.title ?? `Test: ${event}`,
       body: payload?.body ?? 'This is a test notification from GoCart.',
