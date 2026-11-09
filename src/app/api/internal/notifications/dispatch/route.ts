@@ -263,14 +263,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Single notification (immediate dispatch from enqueue_notification)
+  // No send_after filter here — the caller decides when to dispatch
   const body = await req.json().catch(() => ({})) as { id?: string }
   if (body.id) {
     const { data } = await supabaseAdmin
       .from('notifications')
       .select('*')
       .eq('id', body.id)
-      .eq('status', 'pending')
-      .lte('send_after', new Date().toISOString())
+      .in('status', ['pending', 'sending'])
       .single()
     if (data) await dispatchOne(data as Notification)
     return NextResponse.json({ ok: true })
