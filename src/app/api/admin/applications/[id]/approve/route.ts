@@ -17,7 +17,7 @@ export async function POST(
 
   const { data: app } = await admin
     .from('applications')
-    .select('*, profiles(full_name, roles)')
+    .select('*')
     .eq('id', params.id)
     .single()
 
@@ -26,8 +26,13 @@ export async function POST(
     return NextResponse.json({ error: 'Application already decided' }, { status: 400 })
   }
 
-  // Add role to user's roles array
-  const targetProfile = app.profiles as { full_name: string | null; roles: string[] } | null
+  // Fetch profile separately — applications.user_id → auth.users(id), not profiles(id)
+  const { data: targetProfileData } = await admin
+    .from('profiles')
+    .select('full_name, roles')
+    .eq('id', app.user_id)
+    .single()
+  const targetProfile = targetProfileData as { full_name: string | null; roles: string[] } | null
   const existing: string[] = targetProfile?.roles ?? ['customer']
   const newRole = app.kind === 'vendor' ? 'vendor' : 'rider'
 
