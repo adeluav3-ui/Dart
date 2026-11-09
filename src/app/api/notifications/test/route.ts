@@ -53,14 +53,27 @@ export async function POST(req: NextRequest) {
 
   // Kick dispatcher
   const dispatchUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/internal/notifications/dispatch`
-  await fetch(dispatchUrl, {
+  const dispatchRes = await fetch(dispatchUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-dispatch-secret': process.env.INTERNAL_DISPATCH_SECRET ?? '',
     },
     body: JSON.stringify({ id: row.id }),
-  }).catch(() => null)
+  }).catch((err: unknown) => ({ ok: false, status: 0, json: async () => ({ error: String(err) }) } as Response))
+
+  if (!dispatchRes.ok) {
+    const dispatchBody = await dispatchRes.json().catch(() => ({}))
+    return NextResponse.json({
+      ok: false,
+      id: row.id,
+      dispatch_status: dispatchRes.status,
+      dispatch_error: dispatchBody,
+      hint: dispatchRes.status === 403
+        ? 'INTERNAL_DISPATCH_SECRET is not set or does not match in Vercel env vars'
+        : 'Dispatcher returned an error',
+    }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true, id: row.id })
 }
