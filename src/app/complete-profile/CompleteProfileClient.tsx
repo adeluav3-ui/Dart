@@ -54,7 +54,15 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
       .eq('id', user.id)
 
     setSaving(false)
-    if (error) { setPhoneError(error.message); return }
+    if (error) {
+      const msg = error.message ?? ''
+      if (msg.includes('duplicate') || msg.includes('unique') || error.code === '23505') {
+        setPhoneError('That phone number is already linked to another account. Use a different number.')
+      } else {
+        setPhoneError('Something went wrong. Please try again.')
+      }
+      return
+    }
 
     // Route by role so admins/vendors/riders don't land on the customer home
     const { data: profile } = await supabase

@@ -69,7 +69,12 @@ export function LoginForm() {
     })
     setLoading(false)
     if (error) {
-      setError(error.message)
+      const msg = error.message ?? ''
+      if (msg.includes('rate') || msg.includes('too many') || error.status === 429) {
+        setError('Too many attempts. Please wait a minute and try again.')
+      } else {
+        setError('Could not send code. Check your email address and try again.')
+      }
     } else {
       setStep('sent')
       startResendTimer()
@@ -87,7 +92,16 @@ export function LoginForm() {
       type: 'email',
     })
 
-    if (verifyError) { setLoading(false); setError(verifyError.message); return }
+    if (verifyError) {
+      setLoading(false)
+      const msg = verifyError.message ?? ''
+      if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token')) {
+        setError('That code is invalid or has expired. Request a new one.')
+      } else {
+        setError('Verification failed. Please try again.')
+      }
+      return
+    }
     if (!session) { setLoading(false); setError('Sign-in failed — please try again'); return }
 
     const { data: profile } = await supabase
@@ -122,7 +136,15 @@ export function LoginForm() {
       .eq('id', user.id)
 
     setLoading(false)
-    if (error) { setError(error.message); return }
+    if (error) {
+      const msg = error.message ?? ''
+      if (msg.includes('duplicate') || msg.includes('unique') || error.code === '23505') {
+        setError('That phone number is already linked to another account. Use a different number.')
+      } else {
+        setError('Something went wrong. Please try again.')
+      }
+      return
+    }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -142,7 +164,7 @@ export function LoginForm() {
       },
     })
     if (error) {
-      setError(error.message)
+      setError('Could not sign in with Google. Please try again.')
       setGoogleLoading(false)
     }
   }

@@ -47,7 +47,15 @@ export function ProfileClient({ profile, email }: Props) {
       .eq('id', profile.id)
     setSaving(false)
 
-    if (error) { setPhoneError(error.message); return }
+    if (error) {
+      const msg = error.message ?? ''
+      if (msg.includes('duplicate') || msg.includes('unique') || error.code === '23505') {
+        setPhoneError('That phone number is already linked to another account. Use a different number.')
+      } else {
+        setPhoneError('Something went wrong. Please try again.')
+      }
+      return
+    }
     setToast('Profile saved')
     setTimeout(() => router.back(), 1200)
   }
