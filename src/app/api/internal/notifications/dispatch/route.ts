@@ -28,8 +28,8 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? process.env.ADMIN_EMAIL ?? '')
   .split(',').map(e => e.trim()).filter(Boolean)
 
 async function sendEmail(to: string, subject: string, html: string, text: string) {
-  if (!RESEND_API_KEY) return
-  await fetch('https://api.resend.com/emails', {
+  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured')
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -37,6 +37,10 @@ async function sendEmail(to: string, subject: string, html: string, text: string
     },
     body: JSON.stringify({ from: FROM_EMAIL, to, subject, html, text }),
   })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Resend ${res.status}: ${body}`)
+  }
 }
 
 
@@ -148,15 +152,16 @@ async function sendPushToRole(
 
 // ── Dispatch one notification ─────────────────────────────────────────────────
 async function dispatchOne(n: Notification): Promise<void> {
-  // CAS claim — only proceed if attempts hasn't changed under us
-  const { count } = await supabaseAdmin
+  // CAS claim — only proceed if we won the race to update this row
+  const { data: claimed } = await supabaseAdmin
     .from('notifications')
     .update({ attempts: n.attempts + 1, status: 'sending' })
     .eq('id', n.id)
     .eq('attempts', n.attempts)
     .eq('status', 'pending')
+    .select('id')
 
-  if (!count || count === 0) return // already claimed by another worker
+  if (!claimed || claimed.length === 0) return // already claimed by another worker
 
   const skip = await shouldSkip(n)
   if (skip) {
@@ -271,11 +276,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Batch sweep (pg_cron every minute)
+  // Batch sweep (pg_cron every minute) — also recovers rows stuck in 'sending'
   const { data: pending } = await supabaseAdmin
     .from('notifications')
     .select('*')
-    .eq('status', 'pending')
+    .in('status', ['pending', 'sending'])
     .lte('send_after', new Date().toISOString())
     .lt('attempts', 3)
     .order('send_after')
