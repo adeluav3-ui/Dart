@@ -15,7 +15,7 @@ export default async function AdminApplicationsPage() {
   const appList = rawApps ?? []
 
   // Fetch profiles separately (applications.user_id → auth.users, not profiles)
-  const userIds = [...new Set(appList.map((a: { user_id: string }) => a.user_id))]
+  const userIds = Array.from(new Set(appList.map((a: { user_id: string }) => a.user_id)))
   const profileMap: Record<string, { full_name: string | null; phone: string | null }> = {}
   if (userIds.length > 0) {
     const { data: profiles } = await admin
