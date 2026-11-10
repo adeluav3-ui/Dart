@@ -45,11 +45,15 @@ export async function POST(
 
   if (payment.status === 'paid') {
     // Payment row is paid but order wasn't transitioned — fix it now
-    await admin.rpc('transition_order', {
+    const { error: recoverErr } = await admin.rpc('transition_order', {
       p_order_id: orderId,
       p_to_status: 'paid',
       p_note: 'Payment already confirmed — recovery via verify-payment',
     })
+    if (recoverErr) {
+      console.error('[verify-payment] recovery transition_order failed:', recoverErr.message, { orderId })
+      return NextResponse.json({ paid: false, reason: 'transition_failed' })
+    }
     return NextResponse.json({ paid: true })
   }
 

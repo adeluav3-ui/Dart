@@ -244,7 +244,9 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
       const data = await res.json()
       if (data.paid) {
         clearCart()
-        setVerifyMsg('Payment confirmed! Updating order…')
+        setVerifyMsg('Payment confirmed! Order is updating…')
+      } else if (data.reason === 'transition_failed') {
+        setVerifyMsg('Payment confirmed but order update failed — please contact support.')
       } else {
         setVerifyMsg('Payment not confirmed yet. If you paid, please wait a moment and try again.')
       }
