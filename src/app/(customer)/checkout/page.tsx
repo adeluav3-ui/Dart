@@ -25,6 +25,16 @@ export default async function CheckoutPage() {
     supabase.from('coverage_areas').select('*').eq('is_active', true),
   ])
 
+  let profilePhone: string | null = null
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', user.id)
+      .single()
+    profilePhone = profile?.phone ?? null
+  }
+
   const feeSettings = parseServiceFeeSettings(feeRows ?? [])
 
   let walletBalance = 0
@@ -50,6 +60,7 @@ export default async function CheckoutPage() {
       feeSettings={feeSettings}
       coverageAreas={(coverageAreas as CoverageArea[]) ?? []}
       walletBalance={walletBalance}
+      profilePhone={profilePhone}
     />
   )
 }

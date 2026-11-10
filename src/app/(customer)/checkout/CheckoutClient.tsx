@@ -37,11 +37,12 @@ interface Props {
   feeSettings: ServiceFeeSettings
   coverageAreas?: unknown[]
   walletBalance?: number
+  profilePhone?: string | null
 }
 
 const deliveryKey = (userId: string | null) => `dart_delivery_${userId ?? 'guest'}`
 
-export function CheckoutClient({ userId, zones, areas, feeSettings, walletBalance = 0 }: Props) {
+export function CheckoutClient({ userId, zones, areas, feeSettings, walletBalance = 0, profilePhone }: Props) {
   const { cart, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
@@ -49,7 +50,7 @@ export function CheckoutClient({ userId, zones, areas, feeSettings, walletBalanc
   const [pin, setPin] = useState<DeliveryPin | null>(null)
   const [landmark, setLandmark] = useState('')
   const [details, setDetails] = useState('')
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState(profilePhone ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
