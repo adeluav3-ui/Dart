@@ -12,12 +12,14 @@ import { renderRiderApproved } from './rider_approved'
 import { renderAdminAlert } from './admin_alert'
 import { renderAdminPaymentIssue } from './admin_payment_issue'
 import { renderAdminNewApplication } from './admin_new_application'
+import { renderVendorNewOrder } from './vendor_new_order'
 
 type EmailResult = { html: string; text: string }
 type Renderer = (payload: Record<string, unknown>) => EmailResult
 
 const renderers: Record<string, Renderer> = {
   receipt:                renderReceipt,
+  vendor_new_order:       renderVendorNewOrder,
   on_the_way:             renderOnTheWay,
   at_gate:                renderAtGate,
   delivered:              renderDelivered,
