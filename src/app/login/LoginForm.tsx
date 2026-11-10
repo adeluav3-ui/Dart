@@ -12,11 +12,14 @@ import { Input } from '@/components/ui/Input'
 type Step = 'email' | 'sent' | 'profile'
 
 function roleDestination(role: string | null | undefined, next: string): string {
-  // Non-customer roles always go to their dashboard, ignoring `next`.
-  // Only customers honour the `next` redirect (e.g. back to /checkout).
   if (role === 'admin')  return '/admin'
   if (role === 'vendor') return '/vendor'
   if (role === 'rider')  return '/rider'
+  // If a sell-page draft is waiting in localStorage, honour the apply route
+  // even if the PWA launch dropped the ?next= param from the URL.
+  if (typeof window !== 'undefined' && localStorage.getItem('dart_sell_draft')) {
+    return '/account/apply/vendor'
+  }
   return next
 }
 
