@@ -82,11 +82,19 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
       .eq('id', user.id)
       .single()
 
+    // The PWA may strip ?next= from the URL, so also check localStorage
+    // for a redirect saved before the OAuth flow started.
+    let destination = next || '/home'
+    try {
+      const pending = localStorage.getItem('dart_pending_redirect')
+      if (pending) { localStorage.removeItem('dart_pending_redirect'); destination = pending }
+    } catch { /* ignore */ }
+
     const roles: string[] = profile?.roles ?? (profile?.role ? [profile.role] : [])
     if (roles.includes('admin'))       router.push('/admin')
     else if (roles.includes('vendor')) router.push('/vendor')
     else if (roles.includes('rider'))  router.push('/rider')
-    else                               router.push(next || '/home')
+    else                               router.push(destination)
   }
 
   return (

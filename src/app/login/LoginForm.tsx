@@ -160,6 +160,11 @@ export function LoginForm() {
 
   async function signInWithGoogle() {
     setGoogleLoading(true)
+    // Persist the redirect target before the OAuth handoff — the PWA may open
+    // the callback or complete-profile page without the ?next= query param.
+    if (next && next !== '/home') {
+      try { localStorage.setItem('dart_pending_redirect', next) } catch { /* ignore */ }
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
