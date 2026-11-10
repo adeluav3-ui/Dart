@@ -85,11 +85,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    await admin.rpc('transition_order', {
+    const { error: transitionErr } = await admin.rpc('transition_order', {
       p_order_id: order.id,
       p_to_status: 'paid',
       p_note: `Monnify: ${transactionReference}`,
     })
+    if (transitionErr) {
+      console.error('[webhook] transition_order failed:', transitionErr.message, { orderId: order.id })
+    }
 
     // If there was a partial wallet deduction recorded on the order, apply it now
     const walletApplied = (order as { wallet_applied_kobo?: number }).wallet_applied_kobo ?? 0

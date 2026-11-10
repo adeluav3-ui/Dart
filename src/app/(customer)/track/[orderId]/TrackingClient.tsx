@@ -108,11 +108,23 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [now, setNow] = useState(Date.now())
   const { clearCart } = useCart()
 
-  // Clear cart once when returning from Monnify — payment has been initiated.
-  // We clear here rather than before redirect so the customer keeps their cart
-  // if they cancel or if payment fails before they return to the app.
+  // When returning from Monnify (?confirm=1), clear the cart and actively
+  // verify payment. This is the fallback for when the webhook fails or is
+  // delayed — Monnify's API is queried directly to confirm and transition.
   useEffect(() => {
-    if (isConfirmRedirect) clearCart()
+    if (!isConfirmRedirect) return
+    clearCart()
+    if ((order.status as string) !== 'pending_payment') return
+    fetch(`/api/orders/${order.id}/verify-payment`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        // If paid, the realtime subscription picks up the status change.
+        // Log unexpected failures so they appear in Vercel logs.
+        if (!data.paid && data.reason) {
+          console.warn('[verify-payment]', data.reason)
+        }
+      })
+      .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const initialProfiles = (initialOrder as any).profiles as { full_name: string | null; phone: string | null } | null
