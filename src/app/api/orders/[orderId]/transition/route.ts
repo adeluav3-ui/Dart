@@ -76,43 +76,13 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    if (toStatus === 'cancelled') {
-      await triggerRefund(params.orderId, admin)
-    }
-
-    // Notifications (on_the_way, delivered, cancelled_refund) are sent by the
-    // _notify_on_order_event trigger inside transition_order above.
+    // Refund (ledger entry + payment status) is written by transition_order
+    // in the DB for both manual and auto-cancel.
+    // Notifications are sent by the _notify_on_order_event trigger.
 
     return NextResponse.json({ order: updated })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal error'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
-}
-
-async function triggerRefund(orderId: string, admin: ReturnType<typeof createAdminClient>) {
-  // Log refund ledger entry — actual Monnify refund called from /api/refund
-  const { data: order } = await admin
-    .from('orders')
-    .select('total, customer_id')
-    .eq('id', orderId)
-    .single()
-
-  if (!order) return
-
-  await admin.from('ledger_entries').insert({
-    order_id: orderId,
-    party_type: 'customer',
-    party_id: order.customer_id,
-    amount: order.total,
-    kind: 'refund',
-    note: 'Order cancelled — full refund',
-  })
-
-  // Fire-and-forget actual Monnify refund
-  fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/refund`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orderId }),
-  }).catch(() => {})
 }
