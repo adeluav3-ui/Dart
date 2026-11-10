@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +21,18 @@ export function RiderApplyClient({ areas, userId }: Props) {
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('dart_ride_draft')
+      if (!saved) return
+      const d = JSON.parse(saved)
+      if (d.areaId)  setAreaId(d.areaId)
+      if (d.rawPhone) setRawPhone(d.rawPhone)
+      if (typeof d.ownBike === 'boolean') setOwnBike(d.ownBike)
+      localStorage.removeItem('dart_ride_draft')
+    } catch { /* ignore */ }
+  }, [])
 
   async function submit() {
     setError('')

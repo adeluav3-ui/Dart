@@ -15,10 +15,11 @@ function roleDestination(role: string | null | undefined, next: string): string 
   if (role === 'admin')  return '/admin'
   if (role === 'vendor') return '/vendor'
   if (role === 'rider')  return '/rider'
-  // If a sell-page draft is waiting in localStorage, honour the apply route
-  // even if the PWA launch dropped the ?next= param from the URL.
-  if (typeof window !== 'undefined' && localStorage.getItem('dart_sell_draft')) {
-    return '/account/apply/vendor'
+  // If a draft is waiting in localStorage, honour the apply route even if
+  // the PWA launch dropped the ?next= param from the URL.
+  if (typeof window !== 'undefined') {
+    if (localStorage.getItem('dart_sell_draft')) return '/account/apply/vendor'
+    if (localStorage.getItem('dart_ride_draft')) return '/account/apply/rider'
   }
   return next
 }

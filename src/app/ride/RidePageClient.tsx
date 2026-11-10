@@ -37,7 +37,7 @@ export function RidePageClient({ areas }: { areas: Area[] }) {
     if (!validatePhone(fullRaw)) { setError('Enter a valid Nigerian mobile number'); return }
 
     try { localStorage.setItem(LS_KEY, JSON.stringify({ areaId, rawPhone, ownBike })) } catch { /* ignore */ }
-    router.push('/login?next=/account/apply/rider')
+    router.push('/account/apply/rider')
   }
 
   return (
@@ -100,7 +100,7 @@ export function RidePageClient({ areas }: { areas: Area[] }) {
 
         <p className="text-center text-[12px] text-ink-2">
           Already have an account?{' '}
-          <Link href="/login?next=/account/apply/rider" className="text-brand font-semibold">Sign in</Link>
+          <Link href="/account/apply/rider" className="text-brand font-semibold">Sign in</Link>
         </p>
       </div>
     </div>
