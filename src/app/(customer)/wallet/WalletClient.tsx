@@ -45,7 +45,6 @@ function TopupSheet({ onClose }: { onClose: () => void }) {
   async function handleTopup() {
     if (!amount) { setError('Select or enter an amount'); return }
     if (amount < 10_000) { setError('Minimum top-up is ₦100'); return }
-    if (amount > 5_000_000) { setError('Maximum top-up is ₦50,000'); return }
 
     setLoading(true)
     setError('')
@@ -108,7 +107,6 @@ function TopupSheet({ onClose }: { onClose: () => void }) {
                 type="number"
                 value={custom}
                 min={100}
-                max={50000}
                 step={1}
                 onChange={e => { setCustom(e.target.value); setSelected(null) }}
                 placeholder="e.g. 1500"

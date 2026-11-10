@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const MIN_TOPUP_KOBO = 10_000   // ₦100
-const MAX_TOPUP_KOBO = 5_000_000 // ₦50,000
+const MIN_TOPUP_KOBO = 10_000 // ₦100
 
 let _tokenCache: { token: string; expiresAt: number } | null = null
 
@@ -42,9 +41,6 @@ export async function POST(req: NextRequest) {
   }
   if (amount < MIN_TOPUP_KOBO) {
     return NextResponse.json({ error: `Minimum top-up is ₦${MIN_TOPUP_KOBO / 100}` }, { status: 400 })
-  }
-  if (amount > MAX_TOPUP_KOBO) {
-    return NextResponse.json({ error: `Maximum top-up is ₦${MAX_TOPUP_KOBO / 100}` }, { status: 400 })
   }
 
   const admin = createAdminClient()
