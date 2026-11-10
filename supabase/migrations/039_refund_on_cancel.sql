@@ -64,15 +64,19 @@ BEGIN
     PERFORM write_delivery_ledger(p_order_id);
   END IF;
 
-  -- On cancellation from a paid state: refund the full order total to the
+  -- On cancellation from a paid state: refund the full order cost to the
   -- customer wallet and mark the payment record as refunded.
+  --
+  -- orders.total = Monnify-charged amount (rawTotal - wallet_applied_kobo).
+  -- Adding wallet_applied_kobo gives the true amount the customer spent so
+  -- that wallet credit used at checkout is also restored.
   IF p_to_status = 'cancelled' AND v_from_status IN ('paid', 'accepted') THEN
     INSERT INTO ledger_entries (order_id, party_type, party_id, amount, kind, note)
     VALUES (
       p_order_id,
       'customer',
       v_order.customer_id,
-      v_order.total,
+      v_order.total + COALESCE(v_order.wallet_applied_kobo, 0),
       'refund',
       CASE
         WHEN p_actor_id IS NULL THEN 'Auto-cancelled: no vendor response'
