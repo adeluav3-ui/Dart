@@ -10,6 +10,7 @@ import { renderWelcome } from './welcome'
 import { renderApproved } from './approved'
 import { renderRiderApproved } from './rider_approved'
 import { renderAdminAlert } from './admin_alert'
+import { renderAdminVendorSilent } from './admin_vendor_silent'
 import { renderAdminPaymentIssue } from './admin_payment_issue'
 import { renderAdminNewApplication } from './admin_new_application'
 import { renderVendorNewOrder } from './vendor_new_order'
@@ -31,6 +32,7 @@ const renderers: Record<string, Renderer> = {
   approved:               renderApproved,
   rider_approved:         renderRiderApproved,
   admin_alert:            renderAdminAlert,
+  admin_vendor_silent:    renderAdminVendorSilent,
   admin_payment_issue:    renderAdminPaymentIssue,
   admin_new_application:  renderAdminNewApplication,
 }
