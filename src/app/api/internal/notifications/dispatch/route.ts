@@ -152,16 +152,22 @@ async function sendPushToRole(
 
 // ── Dispatch one notification ─────────────────────────────────────────────────
 async function dispatchOne(n: Notification): Promise<void> {
-  // CAS claim — only proceed if we won the race to update this row
-  const { data: claimed } = await supabaseAdmin
+  // CAS: atomically increment attempts to claim this row.
+  // Only the worker that wins this race (matching id + attempts + status) proceeds.
+  // We do NOT set status='sending' here because a CHECK constraint may block it.
+  const { data: claimed, error: claimErr } = await supabaseAdmin
     .from('notifications')
-    .update({ attempts: n.attempts + 1, status: 'sending' })
+    .update({ attempts: n.attempts + 1 })
     .eq('id', n.id)
     .eq('attempts', n.attempts)
-    .eq('status', 'pending')
+    .in('status', ['pending', 'sending'])
     .select('id')
 
-  if (!claimed || claimed.length === 0) return // already claimed by another worker
+  if (claimErr) {
+    console.error(`[dispatch] CAS error id=${n.id} event=${n.event}:`, claimErr.message)
+    return
+  }
+  if (!claimed || claimed.length === 0) return
 
   const skip = await shouldSkip(n)
   if (skip) {
@@ -290,6 +296,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ dispatched: 0 })
   }
 
-  await Promise.allSettled(pending.map(n => dispatchOne(n as Notification)))
-  return NextResponse.json({ dispatched: pending.length })
+  let dispatched = 0
+  for (const n of pending) {
+    try {
+      await dispatchOne(n as Notification)
+      dispatched++
+    } catch (err) {
+      console.error(`[dispatch] unhandled error for id=${n.id} event=${n.event}:`, err)
+    }
+  }
+  return NextResponse.json({ dispatched })
 }
