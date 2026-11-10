@@ -294,7 +294,7 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
           <span className="text-[13px] font-semibold text-white/80">
             Order {order.code as string} · {vendor?.name}
           </span>
-          <Link href="/" aria-label="Close" className="w-11 h-11 flex items-center justify-center -mr-2.5">
+          <Link href="/home" aria-label="Close" className="w-11 h-11 flex items-center justify-center -mr-2.5">
             <X size={20} strokeWidth={2.2} stroke="white" />
           </Link>
         </div>

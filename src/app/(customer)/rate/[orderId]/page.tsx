@@ -54,7 +54,7 @@ export default function RatePage({ params }: { params: { orderId: string } }) {
           <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="#F5A524" />
         </svg>
         <h1 className="font-heading font-extrabold text-2xl text-center">Thanks for rating!</h1>
-        <Link href="/" className="text-brand font-semibold">Back to home</Link>
+        <Link href="/home" className="text-brand font-semibold">Back to home</Link>
       </div>
     )
   }
@@ -97,7 +97,7 @@ export default function RatePage({ params }: { params: { orderId: string } }) {
         <Button onClick={submit} loading={loading} disabled={rating === 0} fullWidth size="lg">
           Submit
         </Button>
-        <Link href="/" className="text-sm text-ink-2 underline self-center">Skip</Link>
+        <Link href="/home" className="text-sm text-ink-2 underline self-center">Skip</Link>
       </div>
     </div>
   )

@@ -47,7 +47,7 @@ export function VendorPageClient({ vendor, categories, items, optionGroups, opti
             <span className="text-xs text-[#6B5E4B]">Cover photo</span>
           )}
           <Link
-            href="/"
+            href="/home"
             aria-label="Back to home"
             className="absolute left-4 top-4 w-11 h-11 rounded-full bg-white flex items-center justify-center shadow"
           >
