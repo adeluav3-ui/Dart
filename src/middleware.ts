@@ -62,6 +62,13 @@ export async function middleware(request: NextRequest) {
       return redirectTo('/complete-profile')
     }
 
+    // Honour ?next= for the sell-page → apply flow so already-authenticated
+    // users land on the application form rather than their role dashboard.
+    const next = searchParams.get('next') || ''
+    if (next.startsWith('/account/apply/') && !next.includes('..')) {
+      return redirectTo(next)
+    }
+
     const roles: string[] = profile?.roles ?? (profile?.role ? [profile.role] : ['customer'])
     const lastDash = profile?.last_dashboard
 

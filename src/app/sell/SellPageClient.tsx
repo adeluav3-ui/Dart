@@ -58,7 +58,7 @@ export function SellPageClient({ areas }: { areas: Area[] }) {
     if (!validatePhone(fullRaw)) { setError('Enter a valid Nigerian mobile number'); return }
 
     saveDraft()
-    router.push('/login?next=/account/apply/vendor')
+    router.push('/account/apply/vendor')
   }
 
   return (
@@ -125,7 +125,7 @@ export function SellPageClient({ areas }: { areas: Area[] }) {
 
         <p className="text-center text-[12px] text-ink-2">
           Already have an account?{' '}
-          <Link href="/login?next=/account/apply/vendor" className="text-brand font-semibold">Sign in</Link>
+          <Link href="/account/apply/vendor" className="text-brand font-semibold">Sign in</Link>
         </p>
       </div>
     </div>
