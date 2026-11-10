@@ -108,7 +108,7 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [now, setNow] = useState(Date.now())
   const [verifying, setVerifying] = useState(false)
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null)
-  const { clearCart } = useCart()
+  const { clearCart, cart } = useCart()
 
   // When returning from Monnify (?confirm=1), clear the cart and actively
   // verify payment. This is the fallback for when the webhook fails or is
@@ -234,6 +234,17 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
 
     return () => clearInterval(poll)
   }, []) // intentionally empty — uses refs for current values
+
+  // Clear the cart whenever this order is confirmed — covers both the
+  // Monnify redirect path (?confirm=1) and direct navigation from Orders tab.
+  // Only clears if the cart still holds items for this same vendor.
+  useEffect(() => {
+    const confirmedStatuses: OrderStatus[] = ['paid', 'accepted', 'ready', 'picked_up', 'delivered']
+    if (confirmedStatuses.includes(status) && cart?.vendorId === (order.vendor_id as string)) {
+      clearCart()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
   async function checkPayment() {
     if (verifying) return
