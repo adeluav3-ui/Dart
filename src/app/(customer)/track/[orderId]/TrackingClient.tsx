@@ -106,6 +106,8 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [flash, setFlash] = useState(false)
   const [justCompleted, setJustCompleted] = useState<OrderStatus | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [verifying, setVerifying] = useState(false)
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null)
   const { clearCart } = useCart()
 
   // When returning from Monnify (?confirm=1), clear the cart and actively
@@ -233,6 +235,26 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
     return () => clearInterval(poll)
   }, []) // intentionally empty — uses refs for current values
 
+  async function checkPayment() {
+    if (verifying) return
+    setVerifying(true)
+    setVerifyMsg(null)
+    try {
+      const res = await fetch(`/api/orders/${order.id}/verify-payment`, { method: 'POST' })
+      const data = await res.json()
+      if (data.paid) {
+        clearCart()
+        setVerifyMsg('Payment confirmed! Updating order…')
+      } else {
+        setVerifyMsg('Payment not confirmed yet. If you paid, please wait a moment and try again.')
+      }
+    } catch {
+      setVerifyMsg('Could not check payment status. Try again.')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
   // Clear flash after animation completes
   useEffect(() => {
     if (!flash) return
@@ -350,6 +372,26 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
           </span>
         )}
       </div>
+
+      {/* ── Manual payment check — shown for pending_payment when not arriving from Monnify ── */}
+      {status === 'pending_payment' && !isConfirmRedirect && (
+        <div className="mx-4 mt-3.5 bg-warn-tint border border-warn/30 rounded-2xl px-4 py-3.5 flex flex-col gap-2.5">
+          <p className="text-[13px] text-ink leading-snug">
+            If you&apos;ve already paid, tap below to confirm your payment.
+          </p>
+          <button
+            type="button"
+            onClick={checkPayment}
+            disabled={verifying}
+            className="h-10 px-4 rounded-xl bg-brand text-white text-[13px] font-bold disabled:opacity-60 self-start"
+          >
+            {verifying ? 'Checking…' : 'Check payment status'}
+          </button>
+          {verifyMsg && (
+            <p className="text-[13px] text-ink-2 leading-snug">{verifyMsg}</p>
+          )}
+        </div>
+      )}
 
       {/* ── Push opt-in prompt — shown once on active orders ── */}
       {isActive && <PushPromptCard />}

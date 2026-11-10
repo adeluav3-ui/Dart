@@ -71,7 +71,7 @@ export async function POST(
   const { responseBody: { accessToken } } = await authRes.json()
 
   const statusRes = await fetch(
-    `${baseUrl}/api/v2/transactions/query?paymentReference=${encodeURIComponent(payment.reference)}`,
+    `${baseUrl}/api/v2/merchant/transactions/query?paymentReference=${encodeURIComponent(payment.reference)}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   ).catch(() => null)
 
