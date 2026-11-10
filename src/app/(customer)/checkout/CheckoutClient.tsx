@@ -10,7 +10,6 @@ import { useCart, cartSubtotal } from '@/store/cart'
 import { calcServiceFee, type ServiceFeeSettings } from '@/lib/serviceFee'
 import { Button } from '@/components/ui/Button'
 import { AreaPicker } from '@/components/AreaPicker'
-import { findCoveringArea } from '@/lib/coverageCircles'
 import type { Zone, Area } from '@/types/database'
 
 interface DeliveryPin {
@@ -155,10 +154,13 @@ export function CheckoutClient({ userId, zones, areas, feeSettings, walletBalanc
 
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
-      clearCart()
       if (json.checkoutUrl) {
+        // Don't clear cart yet — payment not confirmed. TrackingClient clears
+        // it when the user returns from Monnify with ?confirm=1.
         window.location.href = json.checkoutUrl
       } else if (json.paid && json.orderId) {
+        // Wallet-covered: payment is immediate, safe to clear now.
+        clearCart()
         router.push(`/track/${json.orderId}`)
       }
     } finally {

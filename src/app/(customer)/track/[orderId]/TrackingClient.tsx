@@ -13,6 +13,7 @@ import {
   isIOS,
   isIOSPushSupported,
 } from '@/lib/notifications/push'
+import { useCart } from '@/store/cart'
 
 // ── One-time push opt-in card ─────────────────────────────────
 const PUSH_PROMPTED_KEY = 'gocart_push_prompted'
@@ -105,6 +106,15 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [flash, setFlash] = useState(false)
   const [justCompleted, setJustCompleted] = useState<OrderStatus | null>(null)
   const [now, setNow] = useState(Date.now())
+  const { clearCart } = useCart()
+
+  // Clear cart once when returning from Monnify — payment has been initiated.
+  // We clear here rather than before redirect so the customer keeps their cart
+  // if they cancel or if payment fails before they return to the app.
+  useEffect(() => {
+    if (isConfirmRedirect) clearCart()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const initialProfiles = (initialOrder as any).profiles as { full_name: string | null; phone: string | null } | null
   const [riderName, setRiderName] = useState<string | null>(initialProfiles?.full_name ?? null)
   const [riderPhone, setRiderPhone] = useState<string | null>(initialProfiles?.phone ?? null)
