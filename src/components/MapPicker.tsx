@@ -333,14 +333,25 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
 
   // ── Phase 1 → Phase 2 ─────────────────────────────────────────────────────
   function handleConfirm() {
-    const covering = findCoveringArea(center.lat, center.lng, areas ?? [])
-    if (!covering) { setShowWaitlist(true); return }
-    setConfirmedPos({
-      lat: center.lat,
-      lng: center.lng,
-      areaName: covering.name,
-      previewName: previewName || covering.name,
-    })
+    if ((areas?.length ?? 0) > 0) {
+      const covering = findCoveringArea(center.lat, center.lng, areas ?? [])
+      if (!covering) { setShowWaitlist(true); return }
+      setConfirmedPos({
+        lat: center.lat,
+        lng: center.lng,
+        areaName: covering.name,
+        previewName: previewName || covering.name,
+      })
+    } else {
+      // No delivery areas configured (e.g. vendor setting their shop location) —
+      // allow pinning anywhere; use the reverse-geocoded name as the area label.
+      setConfirmedPos({
+        lat: center.lat,
+        lng: center.lng,
+        areaName: previewName || 'My location',
+        previewName: previewName || 'My location',
+      })
+    }
     setPhase('describe')
   }
 
@@ -369,7 +380,8 @@ export function MapPicker({ initialLat, initialLng, onConfirm, onClose, areas, u
     onConfirm(confirmedPos.lat, confirmedPos.lng, confirmedPos.areaName, description.trim(), label)
   }
 
-  const isOutside = !findCoveringArea(center.lat, center.lng, areas ?? [])
+  // Only block confirm if areas are actually provided and the pin is outside all of them
+  const isOutside = (areas?.length ?? 0) > 0 && !findCoveringArea(center.lat, center.lng, areas ?? [])
   const showResultsDropdown = searchInput.length >= 3 && (searchResults !== null || searchUnavailable)
 
   // ── Phase 2: description screen ───────────────────────────────────────────
