@@ -47,23 +47,38 @@ export async function isPushSubscribed(): Promise<boolean> {
 export async function enablePush(): Promise<boolean> {
   if (!isPushSupported()) return false
   if (isIOS() && !isIOSPushSupported()) return false
+  if (!VAPID_PUBLIC_KEY) {
+    console.error('[push] NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set')
+    return false
+  }
 
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return false
 
   try {
-    const swReady = Promise.race([
-      navigator.serviceWorker.ready,
+    // Don't use serviceWorker.ready — it hangs forever if the Workbox SW
+    // fails to install (precache error). getRegistration() returns the
+    // registration immediately regardless of SW state. Chrome/Firefox
+    // allow pushManager.subscribe() even before SW activates.
+    let reg = await navigator.serviceWorker.getRegistration('/')
+    if (!reg) {
+      reg = await navigator.serviceWorker.register('/sw.js')
+    }
+    if (!reg) {
+      console.error('[push] No service worker registration found')
+      return false
+    }
+
+    const existing = await reg.pushManager.getSubscription()
+    const sub = existing ?? await Promise.race([
+      reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource,
+      }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('sw_timeout')), 10_000)
+        setTimeout(() => reject(new Error('subscribe_timeout')), 20_000)
       ),
     ])
-    const reg = await swReady
-    const existing = await reg.pushManager.getSubscription()
-    const sub = existing ?? await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource,
-    })
 
     const res = await fetch('/api/push/subscribe', {
       method: 'POST',
@@ -79,11 +94,12 @@ export async function enablePush(): Promise<boolean> {
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      console.error('push subscribe failed:', body)
+      console.error('[push] subscribe API failed:', body)
       return false
     }
     return true
-  } catch {
+  } catch (err) {
+    console.error('[push] enablePush error:', err)
     return false
   }
 }
