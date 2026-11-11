@@ -7,7 +7,7 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json() as { bank: string; account_no: string; account_name: string }
+  const body = await req.json() as { bank: string; bank_code: string; account_no: string; account_name: string }
 
   const admin = createAdminClient()
 
@@ -15,8 +15,9 @@ export async function PATCH(req: NextRequest) {
   if (!rider) return NextResponse.json({ error: 'Not a registered rider' }, { status: 403 })
 
   const { error } = await admin.from('riders').update({
-    payout_bank: body.bank,
-    payout_account_no: body.account_no,
+    payout_bank:      body.bank,
+    payout_bank_code: body.bank_code || null,
+    payout_account_no:   body.account_no,
     payout_account_name: body.account_name,
   }).eq('id', user.id)
 

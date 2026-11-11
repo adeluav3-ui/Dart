@@ -3,6 +3,7 @@
 import { useState, useRef, lazy, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { VendorNav } from '@/components/vendor/VendorNav'
+import { BankAccountForm, type BankAccountValues } from '@/components/ui/BankAccountForm'
 import type { Vendor, VendorHours, Area } from '@/types/database'
 
 const MapPicker = lazy(() => import('@/components/MapPicker').then(m => ({ default: m.MapPicker })))
@@ -61,11 +62,15 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
   const [hoursSaved, setHoursSaved] = useState(false)
 
   // Payout
-  const [payoutBank, setPayoutBank] = useState(vendor.payout_bank ?? '')
-  const [payoutAccountName, setPayoutAccountName] = useState(vendor.payout_account_name ?? '')
-  const [payoutAccountNo, setPayoutAccountNo] = useState(vendor.payout_account_no ?? '')
+  const [payoutData, setPayoutData] = useState<BankAccountValues>({
+    bankCode:    (vendor as unknown as Record<string, string>).payout_bank_code ?? '',
+    bankName:    vendor.payout_bank ?? '',
+    accountNo:   vendor.payout_account_no ?? '',
+    accountName: vendor.payout_account_name ?? '',
+  })
   const [savingPayout, setSavingPayout] = useState(false)
   const [payoutSaved, setPayoutSaved] = useState(false)
+  const [payoutError, setPayoutError] = useState('')
 
   // Push
   const [pushEnabled, setPushEnabled] = useState(hasPushSub)
@@ -150,13 +155,19 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
   }
 
   async function savePayout() {
+    if (!payoutData.bankName || !payoutData.accountNo || !payoutData.accountName) {
+      setPayoutError('Fill in all payout fields')
+      return
+    }
     setSavingPayout(true)
+    setPayoutError('')
     await supabase
       .from('vendors')
       .update({
-        payout_bank: payoutBank.trim() || null,
-        payout_account_name: payoutAccountName.trim() || null,
-        payout_account_no: payoutAccountNo.trim() || null,
+        payout_bank:         payoutData.bankName || null,
+        payout_bank_code:    payoutData.bankCode || null,
+        payout_account_name: payoutData.accountName || null,
+        payout_account_no:   payoutData.accountNo || null,
       })
       .eq('id', vendor.id)
     setSavingPayout(false)
@@ -372,47 +383,23 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
         <section className="bg-white rounded-2xl p-4 flex flex-col gap-4">
           <h2 className="font-bold text-base">Payout account</h2>
           <p className="text-xs text-ink-2 -mt-2">
-            Earnings after commission are paid to this account weekly.
+            Withdraw earnings to this account.
           </p>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-ink-2">Bank name</label>
-            <input
-              type="text"
-              value={payoutBank}
-              onChange={e => setPayoutBank(e.target.value)}
-              placeholder="e.g. Access Bank"
-              className="h-11 px-4 rounded-xl border border-line text-sm font-body"
-            />
-          </div>
+          <BankAccountForm
+            defaultBankCode={payoutData.bankCode}
+            defaultBankName={payoutData.bankName}
+            defaultAccountNo={payoutData.accountNo}
+            defaultAccountName={payoutData.accountName}
+            onChange={setPayoutData}
+            onVerifyError={msg => setPayoutError(msg)}
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-ink-2">Account name</label>
-            <input
-              type="text"
-              value={payoutAccountName}
-              onChange={e => setPayoutAccountName(e.target.value)}
-              placeholder="Full name on account"
-              className="h-11 px-4 rounded-xl border border-line text-sm font-body"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-ink-2">Account number</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={payoutAccountNo}
-              onChange={e => setPayoutAccountNo(e.target.value)}
-              placeholder="10-digit NUBAN"
-              maxLength={10}
-              className="h-11 px-4 rounded-xl border border-line text-sm font-body"
-            />
-          </div>
+          {payoutError && <p className="text-sm text-danger">{payoutError}</p>}
 
           <button
             type="button"
-            disabled={savingPayout}
+            disabled={savingPayout || !payoutData.bankName || !payoutData.accountNo || !payoutData.accountName}
             onClick={savePayout}
             className="h-10 rounded-xl bg-brand text-white font-bold text-sm border-0 disabled:opacity-50"
           >

@@ -28,7 +28,7 @@ export default async function RiderEarningsPage() {
       .order('created_at', { ascending: false }),
     admin
       .from('riders')
-      .select('payout_bank, payout_account_name, payout_account_no')
+      .select('payout_bank, payout_bank_code, payout_account_name, payout_account_no')
       .eq('id', user.id)
       .single(),
   ])
@@ -38,6 +38,7 @@ export default async function RiderEarningsPage() {
       riderId={user.id}
       entries={(ledger ?? []) as any[]}
       payoutBank={rider?.payout_bank ?? null}
+      payoutBankCode={rider?.payout_bank_code ?? null}
       payoutAccountName={rider?.payout_account_name ?? null}
       payoutAccountNo={rider?.payout_account_no ?? null}
     />

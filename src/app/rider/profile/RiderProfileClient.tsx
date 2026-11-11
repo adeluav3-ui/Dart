@@ -5,19 +5,15 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { normalisePhone } from '@/lib/format'
 import { Toast } from '@/components/ui/Toast'
+import { BankAccountForm, type BankAccountValues } from '@/components/ui/BankAccountForm'
 import { RiderBottomNav } from '@/components/rider/RiderBottomNav'
-
-const NG_BANKS = [
-  'Access Bank', 'Fidelity Bank', 'First Bank', 'GTBank', 'Keystone Bank',
-  'Opay', 'PalmPay', 'Polaris Bank', 'Stanbic IBTC', 'Sterling Bank',
-  'UBA', 'Union Bank', 'VFD Microfinance', 'Wema Bank', 'Zenith Bank',
-]
 
 interface Props {
   userId: string
   fullName: string
   phone: string
   bikePlate: string | null
+  payoutBankCode: string
   payoutBank: string
   payoutAccountName: string
   payoutAccountNo: string
@@ -25,7 +21,7 @@ interface Props {
 
 export function RiderProfileClient({
   userId, fullName: initName, phone: initPhone, bikePlate,
-  payoutBank: initBank, payoutAccountName: initAccName, payoutAccountNo: initAccNo,
+  payoutBankCode, payoutBank, payoutAccountName, payoutAccountNo,
 }: Props) {
   const supabase = createClient()
 
@@ -33,10 +29,12 @@ export function RiderProfileClient({
   const [phone, setPhone] = useState(initPhone)
   const [savingProfile, setSavingProfile] = useState(false)
 
-  const [bank, setBank] = useState(initBank)
-  const [accNo, setAccNo] = useState(initAccNo)
-  const [accName, setAccName] = useState(initAccName)
-  const [lookingUp, setLookingUp] = useState(false)
+  const [payoutData, setPayoutData] = useState<BankAccountValues>({
+    bankCode:    payoutBankCode,
+    bankName:    payoutBank,
+    accountNo:   payoutAccountNo,
+    accountName: payoutAccountName,
+  })
   const [savingPayout, setSavingPayout] = useState(false)
 
   const [toast, setToast] = useState('')
@@ -50,23 +48,21 @@ export function RiderProfileClient({
     setToast('Profile saved')
   }
 
-  async function lookupAccount() {
-    if (!bank || accNo.length < 10) return
-    setLookingUp(true)
-    const res = await fetch(`/api/rider/lookup-account?bank=${encodeURIComponent(bank)}&account=${accNo}`)
-    const json = await res.json().catch(() => ({}))
-    setLookingUp(false)
-    if (json.name) setAccName(json.name)
-    else setToast('Could not look up account. Enter name manually.')
-  }
-
   async function savePayout() {
-    if (!bank || !accNo || !accName) { setToast('Fill in all payout fields'); return }
+    if (!payoutData.bankName || !payoutData.accountNo || !payoutData.accountName) {
+      setToast('Fill in all payout fields')
+      return
+    }
     setSavingPayout(true)
     const res = await fetch('/api/rider/payout-account', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bank, account_no: accNo, account_name: accName }),
+      body: JSON.stringify({
+        bank:         payoutData.bankName,
+        bank_code:    payoutData.bankCode,
+        account_no:   payoutData.accountNo,
+        account_name: payoutData.accountName,
+      }),
     })
     setSavingPayout(false)
     if (res.ok) setToast('Payout account saved')
@@ -133,54 +129,19 @@ export function RiderProfileClient({
         {/* Payout account */}
         <section className="bg-white rounded-2xl p-4 flex flex-col gap-3">
           <h2 className="text-[14px] font-bold text-ink">Payout account</h2>
-          <p className="text-[12px] text-ink-2 -mt-1">Earnings are paid here nightly.</p>
-          <label className="flex flex-col gap-1 text-[12px] font-semibold text-ink-2">
-            Bank
-            <select
-              value={bank}
-              onChange={e => setBank(e.target.value)}
-              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink bg-white"
-            >
-              <option value="">Select bank…</option>
-              {NG_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-[12px] font-semibold text-ink-2">
-            Account number
-            <div className="flex gap-2">
-              <input
-                type="tel"
-                inputMode="numeric"
-                maxLength={10}
-                value={accNo}
-                onChange={e => setAccNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="10 digits"
-                className="flex-1 h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
-              />
-              <button
-                type="button"
-                onClick={lookupAccount}
-                disabled={lookingUp || accNo.length < 10 || !bank}
-                className="h-btn-sm px-4 rounded-xl bg-surface border border-line text-[13px] font-bold text-ink-2 shrink-0 disabled:opacity-40"
-              >
-                {lookingUp ? '…' : 'Verify'}
-              </button>
-            </div>
-          </label>
-          <label className="flex flex-col gap-1 text-[12px] font-semibold text-ink-2">
-            Account name
-            <input
-              type="text"
-              value={accName}
-              onChange={e => setAccName(e.target.value)}
-              placeholder="Filled after verification"
-              className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
-            />
-          </label>
+          <p className="text-[12px] text-ink-2 -mt-1">Withdraw earnings to this account.</p>
+          <BankAccountForm
+            defaultBankCode={payoutBankCode}
+            defaultBankName={payoutBank}
+            defaultAccountNo={payoutAccountNo}
+            defaultAccountName={payoutAccountName}
+            onChange={setPayoutData}
+            onVerifyError={msg => setToast(msg)}
+          />
           <button
             type="button"
             onClick={savePayout}
-            disabled={savingPayout || !bank || !accNo || !accName}
+            disabled={savingPayout || !payoutData.bankName || !payoutData.accountNo || !payoutData.accountName}
             className="h-btn rounded-2xl bg-brand text-white font-bold text-[15px] disabled:opacity-50"
           >
             {savingPayout ? 'Saving…' : 'Save payout account'}

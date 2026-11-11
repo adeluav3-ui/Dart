@@ -14,7 +14,7 @@ export default async function RiderProfilePage() {
   const [{ data: profile }, { data: rider }] = await Promise.all([
     supabase.from('profiles').select('full_name, phone').eq('id', user.id).single(),
     admin.from('riders')
-      .select('bike_plate, payout_bank, payout_account_name, payout_account_no')
+      .select('bike_plate, payout_bank, payout_bank_code, payout_account_name, payout_account_no')
       .eq('id', user.id)
       .single(),
   ])
@@ -25,6 +25,7 @@ export default async function RiderProfilePage() {
       fullName={profile?.full_name ?? ''}
       phone={profile?.phone ?? ''}
       bikePlate={rider?.bike_plate ?? null}
+      payoutBankCode={rider?.payout_bank_code ?? ''}
       payoutBank={rider?.payout_bank ?? ''}
       payoutAccountName={rider?.payout_account_name ?? ''}
       payoutAccountNo={rider?.payout_account_no ?? ''}

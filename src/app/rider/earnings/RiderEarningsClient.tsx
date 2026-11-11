@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { X } from 'lucide-react'
 import { formatMoney, formatTime, formatDate } from '@/lib/format'
+import { Button } from '@/components/ui/Button'
 import { RiderBottomNav } from '@/components/rider/RiderBottomNav'
 
 interface Entry {
@@ -24,6 +27,7 @@ interface Props {
   riderId: string
   entries: Entry[]
   payoutBank: string | null
+  payoutBankCode: string | null
   payoutAccountName: string | null
   payoutAccountNo: string | null
 }
@@ -55,8 +59,98 @@ function routeLabel(entry: Entry): string {
   return entry.orders?.code ?? 'Trip'
 }
 
-export function RiderEarningsClient({ entries, payoutBank, payoutAccountName, payoutAccountNo }: Props) {
+function WithdrawSheet({
+  amount,
+  bankName,
+  accountName,
+  accountNo,
+  hasBankCode,
+  onClose,
+  onSuccess,
+}: {
+  amount: number
+  bankName: string
+  accountName: string
+  accountNo: string
+  hasBankCode: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function withdraw() {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/payout/withdraw', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
+      onSuccess()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
+      <div
+        className="fixed inset-x-0 bottom-0 z-[60] bg-white rounded-t-3xl max-w-md mx-auto flex flex-col"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
+          <span className="font-heading font-bold text-[17px]">Withdraw earnings</span>
+          <button type="button" onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-5 pb-6 flex flex-col gap-4">
+          {!hasBankCode ? (
+            <div className="bg-warn-tint rounded-2xl px-4 py-3 text-[13px] text-warn leading-relaxed">
+              To enable withdrawals, go to your profile, re-select your bank from the dropdown, and save your payout account.
+            </div>
+          ) : (
+            <div className="bg-surface rounded-2xl p-4 flex flex-col gap-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-[13px] text-ink-2">Amount</span>
+                <span className="font-heading font-extrabold text-[20px] text-brand">{formatMoney(amount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[13px] text-ink-2">Bank</span>
+                <span className="text-[14px] font-semibold text-ink">{bankName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[13px] text-ink-2">Account</span>
+                <span className="text-[14px] font-semibold text-ink">{accountName} ••{accountNo.slice(-4)}</span>
+              </div>
+            </div>
+          )}
+          {error && <p className="text-sm text-danger">{error}</p>}
+          {hasBankCode && (
+            <Button onClick={withdraw} loading={loading} fullWidth size="lg">
+              Confirm withdrawal
+            </Button>
+          )}
+          {!hasBankCode && (
+            <Link href="/rider/profile" className="no-underline">
+              <Button variant="secondary" fullWidth size="lg">Go to profile</Button>
+            </Link>
+          )}
+          {hasBankCode && (
+            <p className="text-[12px] text-ink-2 text-center">Funds arrive in your account within minutes.</p>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+export function RiderEarningsClient({ entries, payoutBank, payoutBankCode, payoutAccountName, payoutAccountNo }: Props) {
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>('today')
+  const [showWithdraw, setShowWithdraw] = useState(false)
 
   const today = new Date()
 
@@ -66,7 +160,6 @@ export function RiderEarningsClient({ entries, payoutBank, payoutAccountName, pa
 
   const owedAmount = entries.filter(e => !e.settled_at).reduce((s, e) => s + e.amount, 0)
 
-  // Group this-week entries by day
   const weekDays: { label: string; entries: Entry[]; total: number }[] = []
   const seenDays = new Set<string>()
   for (const entry of entries) {
@@ -87,7 +180,6 @@ export function RiderEarningsClient({ entries, payoutBank, payoutAccountName, pa
   }
 
   const payoutEntries = entries.filter(e => e.settled_at)
-
   const last4 = payoutAccountNo ? `••${payoutAccountNo.slice(-4)}` : null
 
   return (
@@ -101,20 +193,31 @@ export function RiderEarningsClient({ entries, payoutBank, payoutAccountName, pa
       <div className="px-4 py-4 flex flex-col gap-3">
         {/* Owed card */}
         <div className="bg-ink rounded-2xl p-5 flex flex-col gap-1.5">
-          <p className="text-[12px] text-white/60 font-medium">Owed to you today</p>
+          <p className="text-[12px] text-white/60 font-medium">Pending earnings</p>
           <p className="font-heading font-extrabold text-[36px] text-white leading-tight">
             {formatMoney(owedAmount)}
           </p>
           <p className="text-[13px] text-white/70">
-            {todayTrips} {todayTrips === 1 ? 'trip' : 'trips'}
-            {payoutBank && last4 ? ` · paid tonight to ${payoutBank} ${last4}` : ''}
+            {todayTrips} {todayTrips === 1 ? 'trip' : 'trips'} today
+            {payoutBank && last4 ? ` · ${payoutBank} ${last4}` : ''}
           </p>
-          <Link
-            href="/rider/profile"
-            className="text-[13px] font-semibold text-brand mt-1 no-underline"
-          >
-            {payoutAccountNo ? 'Change payout account' : 'Set up payout account'}
-          </Link>
+          <div className="flex items-center gap-3 mt-1">
+            {owedAmount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowWithdraw(true)}
+                className="h-9 px-4 rounded-xl bg-brand-bright text-ink font-bold text-[13px] inline-flex items-center"
+              >
+                Withdraw
+              </button>
+            ) : null}
+            <Link
+              href="/rider/profile"
+              className="text-[13px] font-semibold text-white/60 no-underline"
+            >
+              {payoutAccountNo ? 'Change payout account' : 'Set up payout account →'}
+            </Link>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -154,7 +257,6 @@ export function RiderEarningsClient({ entries, payoutBank, payoutAccountName, pa
                 ))}
               </div>
             )}
-            {/* Info note */}
             <div className="bg-surface rounded-2xl px-4 py-3.5 flex gap-3 items-start">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6168" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-0.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -218,6 +320,21 @@ export function RiderEarningsClient({ entries, payoutBank, payoutAccountName, pa
           </>
         )}
       </div>
+
+      {showWithdraw && (
+        <WithdrawSheet
+          amount={owedAmount}
+          bankName={payoutBank ?? ''}
+          accountName={payoutAccountName ?? ''}
+          accountNo={payoutAccountNo ?? ''}
+          hasBankCode={!!payoutBankCode}
+          onClose={() => setShowWithdraw(false)}
+          onSuccess={() => {
+            setShowWithdraw(false)
+            router.refresh()
+          }}
+        />
+      )}
 
       <RiderBottomNav />
     </div>
