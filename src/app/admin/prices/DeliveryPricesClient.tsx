@@ -45,7 +45,6 @@ export function DeliveryPricesClient({ initialSettings, googleCallsToday, initia
   const [perKm, setPerKm] = useState(koboToNaira(src.per_km_kobo))
   const [minFare, setMinFare] = useState(koboToNaira(src.min_fare_kobo))
   const [roundTo, setRoundTo] = useState(koboToNaira(src.round_to_kobo))
-  const [riderExtra, setRiderExtra] = useState(koboToNaira(src.rider_extra_kobo))
   const [gocartExtra, setGocartExtra] = useState(koboToNaira(src.gocart_extra_kobo))
   const [maxDist, setMaxDist] = useState(mToStr(src.max_distance_m))
   const [dailyCap, setDailyCap] = useState(String(src.daily_google_call_cap))
@@ -66,7 +65,7 @@ export function DeliveryPricesClient({ initialSettings, googleCallsToday, initia
       per_km_kobo: nairaToKobo(perKm),
       min_fare_kobo: nairaToKobo(minFare),
       round_to_kobo: nairaToKobo(roundTo),
-      rider_extra_kobo: nairaToKobo(riderExtra),
+      rider_extra_kobo: 0,
       gocart_extra_kobo: nairaToKobo(gocartExtra),
       max_distance_m: strToM(maxDist),
       daily_google_call_cap: parseInt(dailyCap || '400', 10),
@@ -85,7 +84,7 @@ export function DeliveryPricesClient({ initialSettings, googleCallsToday, initia
     per_km_kobo: nairaToKobo(perKm),
     min_fare_kobo: nairaToKobo(minFare),
     round_to_kobo: nairaToKobo(roundTo),
-    rider_extra_kobo: nairaToKobo(riderExtra),
+    rider_extra_kobo: 0,
     gocart_extra_kobo: nairaToKobo(gocartExtra),
     max_distance_m: strToM(maxDist),
     daily_google_call_cap: parseInt(dailyCap || '400', 10),
@@ -124,7 +123,8 @@ export function DeliveryPricesClient({ initialSettings, googleCallsToday, initia
         <section className="bg-white rounded-2xl p-4 flex flex-col gap-4">
           <h2 className="font-bold text-base">Fare formula</h2>
           <p className="text-xs text-ink-2 -mt-2">
-            okada_fare = max(min_fare, ceil((base + per_km × km) / round_to) × round_to)
+            market_rate = max(min_fare, ceil((base + per_km × km) / round_to) × round_to)<br />
+            customer_fee = market_rate + GoCart margin · rider_pay = market_rate
           </p>
 
           <div className="grid grid-cols-2 gap-3">
@@ -132,8 +132,7 @@ export function DeliveryPricesClient({ initialSettings, googleCallsToday, initia
             <Field label="Per km (₦)" value={perKm} onChange={setPerKm} />
             <Field label="Min fare (₦)" value={minFare} onChange={setMinFare} />
             <Field label="Round to (₦)" value={roundTo} onChange={setRoundTo} />
-            <Field label="Rider extra (₦)" value={riderExtra} onChange={setRiderExtra} />
-            <Field label="GoCart extra (₦)" value={gocartExtra} onChange={setGocartExtra} />
+            <Field label="GoCart margin (₦)" value={gocartExtra} onChange={setGocartExtra} />
             <Field label="Max distance (m)" value={maxDist} onChange={setMaxDist} isMetres />
             <Field label="Daily Google cap" value={dailyCap} onChange={setDailyCap} isMetres />
           </div>
@@ -159,13 +158,13 @@ export function DeliveryPricesClient({ initialSettings, googleCallsToday, initia
 
           {testResult && (
             <div className="bg-surface rounded-xl p-4 flex flex-col gap-2 text-sm">
-              <Row label="Okada fare (customer pays)" value={formatMoney(testResult.okada_fare)} />
-              <Row label="Rider pay" value={formatMoney(testResult.rider_pay)} />
-              <Row label="GoCart delivery cost" value={formatMoney(testResult.delivery_fee)} />
+              <Row label="Customer delivery fee" value={formatMoney(testResult.okada_fare)} />
+              <Row label="Rider earns" value={formatMoney(testResult.rider_pay)} />
+              <Row label="GoCart delivery margin" value={formatMoney(testResult.okada_fare - testResult.rider_pay)} />
               <Row label="Service fee" value={formatMoney(testServiceFee)} />
               <div className="h-px bg-line my-1" />
               <Row label="Customer total" value={formatMoney(testSubtotal + testResult.okada_fare + testServiceFee)} bold />
-              <Row label="GoCart margin" value={formatMoney(testResult.delivery_fee - testResult.rider_pay + testServiceFee)} bold />
+              <Row label="GoCart total margin" value={formatMoney(testResult.okada_fare - testResult.rider_pay + testServiceFee)} bold />
             </div>
           )}
         </section>

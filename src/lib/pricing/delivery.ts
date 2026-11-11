@@ -23,12 +23,13 @@ export function calcDeliveryPrice(
 ): DeliveryPrice {
   const km = distanceM / 1000
   const raw = s.base_fare_kobo + s.per_km_kobo * km
-  const okada_fare = Math.max(
+  const market_fare = Math.max(
     s.min_fare_kobo,
     Math.ceil(raw / s.round_to_kobo) * s.round_to_kobo
   )
-  const rider_pay = okada_fare + s.rider_extra_kobo
-  const delivery_fee = okada_fare + s.rider_extra_kobo + s.gocart_extra_kobo
+  const rider_pay   = market_fare                        // rider earns the okada market rate
+  const okada_fare  = market_fare + s.gocart_extra_kobo  // customer pays market rate + GoCart margin
+  const delivery_fee = okada_fare
   return { okada_fare, rider_pay, delivery_fee }
 }
 

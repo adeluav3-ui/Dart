@@ -12,14 +12,15 @@ const settings: DeliveryPricingSettings = {
   daily_google_call_cap: 400,
 }
 
+// okada_fare = market_fare + gocart_extra (₦100), so each expected value is market_fare + 100
 const cases: [number, number][] = [
-  [300, 200],
-  [700, 250],
-  [1000, 300],
-  [1400, 350],
-  [1900, 400],
-  [2700, 500],
-  [4500, 750],
+  [300,  300],
+  [700,  350],
+  [1000, 400],
+  [1400, 450],
+  [1900, 500],
+  [2700, 600],
+  [4500, 850],
 ]
 
 describe('calcDeliveryPrice', () => {
