@@ -172,7 +172,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
       .eq('id', vendor.id)
     setSavingPayout(false)
     if (error) {
-      setPayoutError('Could not save. Try again.')
+      setPayoutError(error.message || 'Could not save. Try again.')
       return
     }
     setPayoutSaved(true)

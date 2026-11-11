@@ -64,9 +64,10 @@ export function RiderProfileClient({
         account_name: payoutData.accountName,
       }),
     })
+    const json = await res.json().catch(() => ({}))
     setSavingPayout(false)
     if (res.ok) setToast('Payout account saved')
-    else setToast('Could not save. Try again.')
+    else setToast((json as { error?: string }).error || 'Could not save. Try again.')
   }
 
   async function signOut() {

@@ -363,6 +363,20 @@ export function LoginForm() {
           </p>
         </div>
 
+        <div className="bg-warn-tint border border-warn/30 rounded-2xl px-4 py-3 flex flex-col gap-1">
+          <p className="text-[13px] font-semibold text-warn">Already a vendor or rider?</p>
+          <p className="text-[13px] text-warn leading-relaxed">
+            If you signed up with Google, sign out and tap <span className="font-semibold">Continue with Google</span> to access your existing account. Email and Google sign-ins are separate accounts.
+          </p>
+          <button
+            type="button"
+            onClick={() => supabase.auth.signOut().then(() => { window.location.href = '/login' })}
+            className="text-[13px] font-semibold text-brand self-start mt-0.5"
+          >
+            Sign out and use Google instead
+          </button>
+        </div>
+
         <div className="flex flex-col gap-4">
           <Input
             label="Full name"
