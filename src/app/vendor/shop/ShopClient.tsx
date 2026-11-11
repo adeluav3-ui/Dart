@@ -161,7 +161,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
     }
     setSavingPayout(true)
     setPayoutError('')
-    await supabase
+    const { error } = await supabase
       .from('vendors')
       .update({
         payout_bank:         payoutData.bankName || null,
@@ -171,6 +171,10 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
       })
       .eq('id', vendor.id)
     setSavingPayout(false)
+    if (error) {
+      setPayoutError('Could not save. Try again.')
+      return
+    }
     setPayoutSaved(true)
     setTimeout(() => setPayoutSaved(false), 2000)
   }
