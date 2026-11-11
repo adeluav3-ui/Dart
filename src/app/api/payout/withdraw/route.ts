@@ -49,7 +49,7 @@ export async function POST() {
     )
   }
 
-  // Load unsettled earning entries for this party
+  // Load unsettled earning entries not already tagged with an in-flight payout
   const { data: entries } = await admin
     .from('ledger_entries')
     .select('id, amount')
@@ -57,17 +57,19 @@ export async function POST() {
     .eq('party_id', user.id)
     .eq('kind', 'earning')
     .is('settled_at', null)
+    .is('payout_ref', null)
 
   const total = (entries ?? []).reduce((s: number, e: { amount: number }) => s + e.amount, 0)
 
   if (total < MIN_KOBO) {
     return NextResponse.json(
-      { error: total === 0 ? 'No pending earnings to withdraw.' : `Minimum withdrawal is ₦500. You have ${total / 100} pending.` },
+      { error: total === 0 ? 'No pending earnings to withdraw.' : `Minimum withdrawal is ₦500. You have ₦${(total / 100).toLocaleString('en-NG')} pending.` },
       { status: 400 }
     )
   }
 
   const reference = `GC-PAY-${user.id.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
+  const ids = (entries ?? []).map((e: { id: string }) => e.id)
 
   // Call Monnify Single Transfer
   let result
@@ -89,44 +91,45 @@ export async function POST() {
     return NextResponse.json({ error: 'Transfer was declined by the bank. Check your account details.' }, { status: 400 })
   }
 
-  // Mark earning entries as settled and record payout in note
-  const ids = (entries ?? []).map((e: { id: string }) => e.id)
-  await admin
-    .from('ledger_entries')
-    .update({ settled_at: new Date().toISOString(), note: `Withdrawn via Monnify ref: ${reference}` })
-    .in('id', ids)
+  if (result.status === 'SUCCESS') {
+    // Synchronous success — settle immediately and send email
+    await admin
+      .from('ledger_entries')
+      .update({ settled_at: new Date().toISOString(), payout_ref: reference, note: `Paid via Monnify: ${reference}` })
+      .in('id', ids)
 
-  // Send payout email notification
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('full_name, email:id')
-    .eq('id', user.id)
-    .single()
+    const { data: authUser } = await admin.auth.admin.getUserById(user.id)
+    const recipientEmail = authUser?.user?.email ?? ''
+    const { data: profile } = await admin.from('profiles').select('full_name').eq('id', user.id).single()
 
-  const { data: authUser } = await admin.auth.admin.getUserById(user.id)
-  const recipientEmail = authUser?.user?.email ?? ''
+    await admin.rpc('enqueue_notification', {
+      p_event:             'payout',
+      p_order_id:          null,
+      p_recipient_user_id: user.id,
+      p_recipient_email:   recipientEmail,
+      p_recipient_role:    partyType,
+      p_channel:           'email',
+      p_title:             'Payout sent',
+      p_body:              `Your payout of ₦${(total / 100).toLocaleString('en-NG')} has been sent.`,
+      p_email_subject:     `GoCart payout: ₦${(total / 100).toLocaleString('en-NG')}`,
+      p_email_template:    'payout',
+      p_payload:           {
+        recipient_name: (profile as { full_name?: string } | null)?.full_name ?? '',
+        amount:         total,
+        order_count:    ids.length,
+        bank_name:      bankName,
+        account_name:   accountName,
+        reference,
+      },
+      p_dedupe_key: `payout:${reference}`,
+    }).then(() => null, () => null)
+  } else {
+    // PENDING — tag entries so they can't be double-withdrawn; webhook will settle them
+    await admin
+      .from('ledger_entries')
+      .update({ payout_ref: reference })
+      .in('id', ids)
+  }
 
-  await admin.rpc('enqueue_notification', {
-    p_event:             'payout',
-    p_order_id:          null,
-    p_recipient_user_id: user.id,
-    p_recipient_email:   recipientEmail,
-    p_recipient_role:    partyType,
-    p_channel:           'email',
-    p_title:             'Payout sent',
-    p_body:              `Your payout of ₦${(total / 100).toLocaleString('en-NG')} has been sent.`,
-    p_email_subject:     `GoCart payout: ₦${(total / 100).toLocaleString('en-NG')}`,
-    p_email_template:    'payout',
-    p_payload:           {
-      recipient_name: (profile as { full_name?: string } | null)?.full_name ?? '',
-      amount:         total,
-      order_count:    ids.length,
-      bank_name:      bankName,
-      account_name:   accountName,
-      reference,
-    },
-    p_dedupe_key: `payout:${reference}`,
-  }).then(() => null, () => null)
-
-  return NextResponse.json({ ok: true, amount: total, reference })
+  return NextResponse.json({ ok: true, amount: total, reference, status: result.status })
 }
