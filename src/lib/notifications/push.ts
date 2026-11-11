@@ -52,7 +52,13 @@ export async function enablePush(): Promise<boolean> {
   if (permission !== 'granted') return false
 
   try {
-    const reg = await navigator.serviceWorker.ready
+    const swReady = Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('sw_timeout')), 10_000)
+      ),
+    ])
+    const reg = await swReady
     const existing = await reg.pushManager.getSubscription()
     const sub = existing ?? await reg.pushManager.subscribe({
       userVisibleOnly: true,

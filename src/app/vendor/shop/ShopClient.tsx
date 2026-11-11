@@ -204,7 +204,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
       if (perm === 'denied') {
         setPushError('Notifications are blocked. Go to your browser settings and allow notifications for this site, then try again.')
       } else {
-        setPushError('Could not enable alerts. Make sure you\'re using the app in a supported browser and try again.')
+        setPushError('Could not enable alerts. Try refreshing the page and tapping Enable again.')
       }
     }
   }
