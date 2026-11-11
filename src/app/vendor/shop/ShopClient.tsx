@@ -63,7 +63,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
 
   // Payout
   const [payoutData, setPayoutData] = useState<BankAccountValues>({
-    bankCode:    (vendor as unknown as Record<string, string>).payout_bank_code ?? '',
+    bankCode:    vendor.payout_bank_code ?? '',
     bankName:    vendor.payout_bank ?? '',
     accountNo:   vendor.payout_account_no ?? '',
     accountName: vendor.payout_account_name ?? '',
@@ -396,7 +396,6 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
             defaultAccountNo={payoutData.accountNo}
             defaultAccountName={payoutData.accountName}
             onChange={setPayoutData}
-            onVerifyError={msg => setPayoutError(msg)}
           />
 
           {payoutError && <p className="text-sm text-danger">{payoutError}</p>}

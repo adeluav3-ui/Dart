@@ -136,7 +136,6 @@ export function RiderProfileClient({
             defaultAccountNo={payoutAccountNo}
             defaultAccountName={payoutAccountName}
             onChange={setPayoutData}
-            onVerifyError={msg => setToast(msg)}
           />
           <button
             type="button"

@@ -56,6 +56,7 @@ export interface Vendor {
   rating_avg: number
   rating_count: number
   payout_bank: string | null
+  payout_bank_code: string | null
   payout_account_name: string | null
   payout_account_no: string | null
   created_at: string
@@ -248,6 +249,7 @@ export interface Rider {
   notes: string | null
   bike_plate: string | null
   payout_bank: string | null
+  payout_bank_code: string | null
   payout_account_name: string | null
   payout_account_no: string | null
   created_at: string

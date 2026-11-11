@@ -49,7 +49,7 @@ export default async function VendorEarningsPage() {
       pendingPayout={pendingPayout}
       ledger={(ledger ?? []) as any[]}
       payoutBank={vendor.payout_bank ?? null}
-      payoutBankCode={(vendor as unknown as Record<string, string | null>).payout_bank_code ?? null}
+      payoutBankCode={vendor.payout_bank_code ?? null}
       payoutAccountName={vendor.payout_account_name ?? null}
       payoutAccountNo={vendor.payout_account_no ?? null}
     />

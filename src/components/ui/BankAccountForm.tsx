@@ -17,7 +17,6 @@ interface Props {
   defaultAccountNo?: string
   defaultAccountName?: string
   onChange: (values: BankAccountValues) => void
-  onVerifyError?: (msg: string) => void
 }
 
 export function BankAccountForm({
@@ -26,7 +25,6 @@ export function BankAccountForm({
   defaultAccountNo = '',
   defaultAccountName = '',
   onChange,
-  onVerifyError,
 }: Props) {
   const [banks, setBanks] = useState<Bank[]>([])
   const [search, setSearch] = useState(defaultBankName)
@@ -35,7 +33,6 @@ export function BankAccountForm({
   const [accountNo, setAccountNo] = useState(defaultAccountNo)
   const [accountName, setAccountName] = useState(defaultAccountName)
   const [showList, setShowList] = useState(false)
-  const [verifying, setVerifying] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -49,7 +46,6 @@ export function BankAccountForm({
     function onMouseDown(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setShowList(false)
-        // If user typed but didn't select, restore the last committed bank name
         setSearch(bankName)
       }
     }
@@ -66,34 +62,7 @@ export function BankAccountForm({
     setBankName(b.name)
     setSearch(b.name)
     setShowList(false)
-    // Reset account name when bank changes — requires re-verification
-    setAccountName('')
-    onChange({ bankCode: b.code, bankName: b.name, accountNo, accountName: '' })
-  }
-
-  function handleAccountNoChange(value: string) {
-    setAccountNo(value)
-    setAccountName('')
-    onChange({ bankCode, bankName, accountNo: value, accountName: '' })
-  }
-
-  async function verify() {
-    if (!bankCode || accountNo.length < 10) return
-    setVerifying(true)
-    try {
-      const res = await fetch(`/api/verify-account?bankCode=${encodeURIComponent(bankCode)}&accountNumber=${accountNo}`)
-      const json = await res.json()
-      if (json.name) {
-        setAccountName(json.name)
-        onChange({ bankCode, bankName, accountNo, accountName: json.name })
-      } else {
-        onVerifyError?.('Could not look up account. Enter the account name manually.')
-      }
-    } catch {
-      onVerifyError?.('Could not look up account. Enter the account name manually.')
-    } finally {
-      setVerifying(false)
-    }
+    onChange({ bankCode: b.code, bankName: b.name, accountNo, accountName })
   }
 
   return (
@@ -132,28 +101,22 @@ export function BankAccountForm({
         </div>
       </label>
 
-      {/* Account number + verify */}
+      {/* Account number */}
       <label className="flex flex-col gap-1 text-[12px] font-semibold text-ink-2">
         Account number
-        <div className="flex gap-2">
-          <input
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={accountNo}
-            onChange={e => handleAccountNoChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
-            placeholder="10 digits"
-            className="flex-1 h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
-          />
-          <button
-            type="button"
-            onClick={verify}
-            disabled={verifying || accountNo.length < 10 || !bankCode}
-            className="h-btn-sm px-4 rounded-xl bg-surface border border-line text-[13px] font-bold text-ink-2 shrink-0 disabled:opacity-40"
-          >
-            {verifying ? '…' : 'Verify'}
-          </button>
-        </div>
+        <input
+          type="tel"
+          inputMode="numeric"
+          maxLength={10}
+          value={accountNo}
+          onChange={e => {
+            const v = e.target.value.replace(/\D/g, '').slice(0, 10)
+            setAccountNo(v)
+            onChange({ bankCode, bankName, accountNo: v, accountName })
+          }}
+          placeholder="10 digits"
+          className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
+        />
       </label>
 
       {/* Account name */}
@@ -166,7 +129,7 @@ export function BankAccountForm({
             setAccountName(e.target.value)
             onChange({ bankCode, bankName, accountNo, accountName: e.target.value })
           }}
-          placeholder="Filled automatically after verification"
+          placeholder="Full name on account"
           className="h-btn-sm px-3 rounded-xl border border-line font-body text-[15px] text-ink"
         />
       </label>
