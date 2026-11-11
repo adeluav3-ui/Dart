@@ -59,7 +59,7 @@ export async function enablePush(): Promise<boolean> {
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource,
     })
 
-    await fetch('/api/push/subscribe', {
+    const res = await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,6 +71,11 @@ export async function enablePush(): Promise<boolean> {
         user_agent: navigator.userAgent,
       }),
     })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      console.error('push subscribe failed:', body)
+      return false
+    }
     return true
   } catch {
     return false

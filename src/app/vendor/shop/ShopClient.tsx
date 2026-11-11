@@ -4,6 +4,7 @@ import { useState, useRef, lazy, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { VendorNav } from '@/components/vendor/VendorNav'
 import { BankAccountForm, type BankAccountValues } from '@/components/ui/BankAccountForm'
+import { enablePush as doEnablePush, isPushSupported, isIOS, isIOSPushSupported } from '@/lib/notifications/push'
 import type { Vendor, VendorHours, Area } from '@/types/database'
 
 const MapPicker = lazy(() => import('@/components/MapPicker').then(m => ({ default: m.MapPicker })))
@@ -75,6 +76,7 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
   // Push
   const [pushEnabled, setPushEnabled] = useState(hasPushSub)
   const [enablingPush, setEnablingPush] = useState(false)
+  const [pushError, setPushError] = useState('')
 
   // Shop location pin
   const [vendorLat, setVendorLat] = useState(vendor.lat)
@@ -180,33 +182,30 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
   }
 
   async function enablePush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert('Push notifications are not supported in this browser.')
+    setPushError('')
+
+    if (!isPushSupported()) {
+      setPushError('Push notifications are not supported in this browser.')
       return
     }
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    if (!vapidKey) return
+    if (isIOS() && !isIOSPushSupported()) {
+      setPushError('On iPhone, add GoCart to your Home Screen first, then enable alerts.')
+      return
+    }
 
     setEnablingPush(true)
-    try {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      })
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub.toJSON()),
-      })
+    const ok = await doEnablePush()
+    setEnablingPush(false)
+
+    if (ok) {
       setPushEnabled(true)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      if (msg.includes('denied') || msg.includes('permission')) {
-        alert('Permission denied. Enable notifications in your browser settings.')
+    } else {
+      const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default'
+      if (perm === 'denied') {
+        setPushError('Notifications are blocked. Go to your browser settings and allow notifications for this site, then try again.')
+      } else {
+        setPushError('Could not enable alerts. Make sure you\'re using the app in a supported browser and try again.')
       }
-    } finally {
-      setEnablingPush(false)
     }
   }
 
@@ -425,14 +424,19 @@ export function ShopClient({ vendor, initialHours, areas, hasPushSub }: Props) {
               <span className="text-sm font-semibold text-brand-ink">Alerts enabled on this device</span>
             </div>
           ) : (
-            <button
-              type="button"
-              disabled={enablingPush}
-              onClick={enablePush}
-              className="h-10 rounded-xl bg-brand text-white font-bold text-sm border-0 disabled:opacity-50"
-            >
-              {enablingPush ? 'Enabling…' : 'Enable order alerts'}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={enablingPush}
+                onClick={enablePush}
+                className="h-10 rounded-xl bg-brand text-white font-bold text-sm border-0 disabled:opacity-50"
+              >
+                {enablingPush ? 'Enabling…' : 'Enable order alerts'}
+              </button>
+              {pushError && (
+                <p className="text-sm text-danger leading-snug">{pushError}</p>
+              )}
+            </>
           )}
         </section>
 
