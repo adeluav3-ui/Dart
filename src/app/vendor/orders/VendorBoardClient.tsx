@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/format'
 import { VendorNav } from '@/components/vendor/VendorNav'
@@ -65,6 +66,7 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
   const [confirmAssign, setConfirmAssign] = useState<ConfirmAssign | null>(null)
   const [assigning, setAssigning] = useState(false)
 
+  const router = useRouter()
   const supabase = createClient()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const prevNewCount = useRef(initialOrders.filter(o => o.status === 'paid').length)
@@ -156,6 +158,8 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
           ? { ...o, status: toStatus, ...(extra?.prepMins ? { prep_mins: Number(extra.prepMins) } : {}) }
           : o
       ))
+      // Invalidate the router cache so navigating away and back shows fresh data
+      router.refresh()
     }
   }
 

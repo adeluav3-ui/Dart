@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { X, Menu } from 'lucide-react'
@@ -132,6 +133,14 @@ function LandingFooter() {
 }
 
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      router.replace('/start')
+    }
+  }, [router])
+
   return (
     <>
       <LandingNav />
