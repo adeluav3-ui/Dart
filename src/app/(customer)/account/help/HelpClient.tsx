@@ -31,7 +31,7 @@ export function HelpClient({ userId, settings, tickets: initial, orders, isAdmin
 
   const phone = settings.support_phone ?? null
   const email = settings.support_email ?? 'support@gocartng.com'
-  const hours = settings.support_hours ?? 'Mon – Sat · 8 am – 9 pm'
+  const hours = settings.support_hours ?? 'Sun – Sat · 8 am – 10 pm'
 
   function formatPhone(raw: string) {
     return raw.replace('+234', '+234 ').replace(/(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3')
