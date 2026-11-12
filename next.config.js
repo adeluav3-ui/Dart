@@ -8,8 +8,10 @@ const withPWA = require('next-pwa')({
   // Exclude internal Next.js manifests — they 404 on old builds and
   // cause Workbox precache failure, which prevents the SW from activating
   // (and therefore blocks pushManager.subscribe()).
+  // Exclude all internal Next.js manifests — they 404 on any build except
+  // the one that generated them, causing Workbox precache failure.
   exclude: [
-    /app-build-manifest\.json$/,
+    /\/_next\/.*\.json$/,
     /_buildManifest\.js$/,
     /_ssgManifest\.js$/,
   ],
