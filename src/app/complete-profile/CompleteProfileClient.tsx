@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { normalizePhone, validatePhone } from '@/lib/phone'
 import { Button } from '@/components/ui/Button'
@@ -10,13 +11,15 @@ interface Props {
   email: string
   initialName: string
   next: string
+  termsOnly?: boolean // true when profile is already complete — only show terms step
 }
 
-export function CompleteProfileClient({ email, initialName, next }: Props) {
+export function CompleteProfileClient({ email, initialName, next, termsOnly = false }: Props) {
   const [name, setName] = useState(initialName)
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [nameError, setNameError] = useState('')
+  const [termsAgreed, setTermsAgreed] = useState(false)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -39,9 +42,28 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
     setPhoneError('')
   }
 
+  async function recordTermsAcceptance(userId: string) {
+    await fetch('/api/legal/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs: ['customer_terms', 'privacy_policy'], role: 'customer' }),
+    })
+  }
+
   async function handleSubmit() {
     setPhoneError('')
     setNameError('')
+
+    if (termsOnly) {
+      // Profile is already complete — just record acceptance and go
+      setSaving(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      await recordTermsAcceptance(user.id)
+      setSaving(false)
+      router.push(next || '/home')
+      return
+    }
 
     const nameTrimmed = name.trim()
     if (!nameTrimmed) { setNameError('Enter your full name'); return }
@@ -64,8 +86,8 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
       .update({ full_name: nameTrimmed, phone: normalised })
       .eq('id', user.id)
 
-    setSaving(false)
     if (error) {
+      setSaving(false)
       const msg = error.message ?? ''
       if (msg.includes('duplicate') || msg.includes('unique') || error.code === '23505') {
         setPhoneError('That phone number is already linked to another account. Use a different number.')
@@ -74,6 +96,9 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
       }
       return
     }
+
+    await recordTermsAcceptance(user.id)
+    setSaving(false)
 
     // Route by role so admins/vendors/riders don't land on the customer home
     const { data: profile } = await supabase
@@ -114,54 +139,92 @@ export function CompleteProfileClient({ email, initialName, next }: Props) {
         {/* Heading */}
         <div className="flex flex-col gap-1 text-center">
           <h1 className="font-heading font-extrabold text-[26px] text-ink leading-tight">
-            One last thing
+            {termsOnly ? 'Review our terms' : 'One last thing'}
           </h1>
           <p className="text-[14px] text-ink-2 leading-snug">
-            Your rider calls you at delivery — add your name and number so they reach the right person.
+            {termsOnly
+              ? 'Please accept our Terms of Use and Privacy Policy to continue using GoCart.'
+              : 'Your rider calls you at delivery — add your name and number so they reach the right person.'}
           </p>
         </div>
 
-        {/* Form */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Full name</label>
-            <input
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={e => { setName(e.target.value); setNameError('') }}
-              placeholder="First and last name"
-              className="h-12 px-4 rounded-xl border border-line bg-white font-body text-[15px] text-ink focus:outline-none focus:border-brand"
-            />
-            {nameError && <p className="text-[12px] text-danger">{nameError}</p>}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Phone number</label>
-            <div className="flex h-12 rounded-xl border border-line bg-white overflow-hidden focus-within:border-brand">
-              <div className="flex items-center px-3 border-r border-line bg-surface shrink-0">
-                <span className="text-[14px] font-semibold text-ink-2">NG +234</span>
-              </div>
+        {/* Form — hidden in terms-only mode */}
+        {!termsOnly && (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-semibold text-ink-2">Full name</label>
               <input
-                type="tel"
-                inputMode="tel"
-                value={phone}
-                onChange={e => handlePhoneChange(e.target.value)}
-                placeholder="8012345678"
-                className="flex-1 px-3 font-body text-[15px] text-ink bg-transparent focus:outline-none"
+                type="text"
+                autoComplete="name"
+                value={name}
+                onChange={e => { setName(e.target.value); setNameError('') }}
+                placeholder="First and last name"
+                className="h-12 px-4 rounded-xl border border-line bg-white font-body text-[15px] text-ink focus:outline-none focus:border-brand"
               />
+              {nameError && <p className="text-[12px] text-danger">{nameError}</p>}
             </div>
-            {phoneError ? (
-              <p className="text-[12px] text-danger">{phoneError}</p>
-            ) : (
-              <p className="text-[12px] text-ink-2">
-                Use a number that&apos;s on when you order. Riders call this number at delivery.
-              </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-semibold text-ink-2">Phone number</label>
+              <div className="flex h-12 rounded-xl border border-line bg-white overflow-hidden focus-within:border-brand">
+                <div className="flex items-center px-3 border-r border-line bg-surface shrink-0">
+                  <span className="text-[14px] font-semibold text-ink-2">NG +234</span>
+                </div>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={e => handlePhoneChange(e.target.value)}
+                  placeholder="8012345678"
+                  className="flex-1 px-3 font-body text-[15px] text-ink bg-transparent focus:outline-none"
+                />
+              </div>
+              {phoneError ? (
+                <p className="text-[12px] text-danger">{phoneError}</p>
+              ) : (
+                <p className="text-[12px] text-ink-2">
+                  Use a number that&apos;s on when you order. Riders call this number at delivery.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Terms checkbox */}
+        <button
+          type="button"
+          onClick={() => setTermsAgreed(v => !v)}
+          className="flex items-start gap-3 text-left"
+        >
+          <div className={`mt-0.5 w-5 h-5 rounded shrink-0 flex items-center justify-center border-2 transition-colors ${
+            termsAgreed ? 'bg-brand border-brand' : 'border-line'
+          }`}>
+            {termsAgreed && (
+              <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             )}
           </div>
-        </div>
+          <span className="text-[13px] text-ink leading-snug">
+            I agree to the GoCart{' '}
+            <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="text-brand underline" onClick={e => e.stopPropagation()}>
+              Terms of Use
+            </Link>
+            {' '}and{' '}
+            <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-brand underline" onClick={e => e.stopPropagation()}>
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </button>
 
-        <Button onClick={handleSubmit} loading={saving} fullWidth size="lg">
+        <Button
+          onClick={handleSubmit}
+          loading={saving}
+          disabled={!termsAgreed}
+          fullWidth
+          size="lg"
+        >
           Continue
         </Button>
       </div>

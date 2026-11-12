@@ -5,6 +5,7 @@ import { parseServiceFeeSettings, calcServiceFee } from '@/lib/serviceFee'
 import { getRoadDistance } from '@/lib/server/getRoadDistance'
 import { calcDeliveryPrice, type DeliveryPricingSettings } from '@/lib/pricing/delivery'
 import { findCoveringArea } from '@/lib/coverageCircles'
+import { getCurrentVersion } from '@/lib/legal'
 import type { Cart, CartItem, Area } from '@/types/database'
 
 export async function POST(req: NextRequest) {
@@ -15,6 +16,24 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Terms enforcement
+    const [termsVersion, privacyVersion] = [
+      getCurrentVersion('customer_terms'),
+      getCurrentVersion('privacy_policy'),
+    ]
+    const { data: acceptances } = await admin
+      .from('legal_acceptances')
+      .select('document_slug, document_version')
+      .eq('user_id', user.id)
+      .in('document_slug', ['customer_terms', 'privacy_policy'])
+    const accepted = new Map((acceptances ?? []).map(r => [r.document_slug, r.document_version]))
+    if (accepted.get('customer_terms') !== termsVersion || accepted.get('privacy_policy') !== privacyVersion) {
+      return NextResponse.json(
+        { error: 'Please accept our updated terms to continue.', code: 'TERMS_NOT_ACCEPTED' },
+        { status: 403 }
+      )
     }
 
     const body = await req.json()

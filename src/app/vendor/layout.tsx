@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { CURRENT_LEGAL_VERSIONS } from '@/lib/legalVersions'
 
 export default async function VendorLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -16,6 +17,24 @@ export default async function VendorLayout({ children }: { children: React.React
   const roles: string[] = profile?.roles ?? []
   if (!roles.includes('vendor') && !roles.includes('admin')) {
     redirect('/')
+  }
+
+  // Admins bypass the terms check
+  if (!roles.includes('admin')) {
+    const slug = 'vendor_agreement'
+    const version = CURRENT_LEGAL_VERSIONS[slug]
+    const { data: row } = await supabase
+      .from('legal_acceptances')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('document_slug', slug)
+      .eq('document_version', version)
+      .maybeSingle()
+
+    if (!row) {
+      const params = new URLSearchParams({ slugs: slug, role: 'vendor', next: '/vendor' })
+      redirect(`/legal/re-accept?${params}`)
+    }
   }
 
   return <>{children}</>

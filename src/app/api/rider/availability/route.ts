@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentVersion } from '@/lib/legal'
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
@@ -24,6 +25,24 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!rider) return NextResponse.json({ error: 'Not a registered rider' }, { status: 403 })
+
+  // Terms enforcement — only block going available, not going offline
+  if (body.available) {
+    const version = getCurrentVersion('rider_agreement')
+    const { data: row } = await admin
+      .from('legal_acceptances')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('document_slug', 'rider_agreement')
+      .eq('document_version', version)
+      .maybeSingle()
+    if (!row) {
+      return NextResponse.json(
+        { error: 'Please accept our updated terms to continue.', code: 'TERMS_NOT_ACCEPTED' },
+        { status: 403 }
+      )
+    }
+  }
 
   const update: Record<string, unknown> = { is_available: body.available }
 

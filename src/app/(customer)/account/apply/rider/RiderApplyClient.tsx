@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { validatePhone, normalizePhone } from '@/lib/phone'
@@ -17,6 +18,7 @@ export function RiderApplyClient({ areas, userId }: Props) {
   const [areaId, setAreaId] = useState('')
   const [rawPhone, setRawPhone] = useState('')
   const [ownBike, setOwnBike] = useState(false)
+  const [agreementTicked, setAgreementTicked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
@@ -39,8 +41,16 @@ export function RiderApplyClient({ areas, userId }: Props) {
     if (!areaId) { setError('Select your area'); return }
     const fullRaw = '0' + rawPhone.replace(/\D/g, '')
     if (!validatePhone(fullRaw)) { setError('Enter a valid Nigerian mobile number'); return }
+    if (!agreementTicked) { setError('You must agree to the Rider Agreement to continue'); return }
 
     setSaving(true)
+    // Record agreement acceptance before submitting the application
+    await fetch('/api/legal/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs: ['rider_agreement', 'privacy_policy'], role: 'rider' }),
+    })
+
     const phone = normalizePhone(fullRaw)!
     const res = await fetch('/api/applications/submit', {
       method: 'POST',
@@ -125,9 +135,38 @@ export function RiderApplyClient({ areas, userId }: Props) {
           I have my own motorcycle
         </button>
 
+        {/* Rider agreement */}
+        <div className="bg-surface rounded-2xl p-4 flex flex-col gap-3">
+          <p className="text-[13px] text-ink-2 leading-snug">
+            Please read the{' '}
+            <Link href="/legal/rider-agreement" target="_blank" rel="noopener noreferrer" className="text-brand underline">
+              GoCart Rider Agreement
+            </Link>
+            {' '}before continuing.
+          </p>
+          <button
+            type="button"
+            onClick={() => setAgreementTicked(v => !v)}
+            className="flex items-start gap-3 text-left"
+          >
+            <div className={`mt-0.5 w-5 h-5 rounded shrink-0 flex items-center justify-center border-2 transition-colors ${
+              agreementTicked ? 'bg-brand border-brand' : 'border-line'
+            }`}>
+              {agreementTicked && (
+                <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                  <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+            <span className="text-[13px] text-ink leading-snug">
+              I agree to the GoCart Rider Agreement. I am at least 18 and hold a valid motorcycle riding licence.
+            </span>
+          </button>
+        </div>
+
         {error && <p className="text-[13px] text-danger">{error}</p>}
 
-        <Button onClick={submit} loading={saving} fullWidth size="lg">Submit application</Button>
+        <Button onClick={submit} loading={saving} disabled={!agreementTicked} fullWidth size="lg">Submit application</Button>
       </div>
     </div>
   )

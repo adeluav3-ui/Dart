@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { validatePhone, normalizePhone } from '@/lib/phone'
@@ -22,10 +23,18 @@ export function VendorApplyClient({ areas, userId }: Props) {
   const [landmark, setLandmark] = useState('')
   const [rawPhone, setRawPhone] = useState('')
   const [pcnLicence, setPcnLicence] = useState('')
+  const [agreementTicked, setAgreementTicked] = useState(false)
+  const [pcnDeclarationTicked, setPcnDeclarationTicked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+
+  const SCHEDULE: Record<typeof storeType, { label: string; anchor: string }> = {
+    restaurant:   { label: 'Schedule A for Restaurants', anchor: 'schedule-a' },
+    supermarket:  { label: 'Schedule B for Supermarkets and stores', anchor: 'schedule-b' },
+    pharmacy:     { label: 'Schedule C for Pharmacies', anchor: 'schedule-c' },
+  }
 
   // Restore draft saved by /sell (unauthenticated pre-fill flow)
   useEffect(() => {
@@ -49,9 +58,25 @@ export function VendorApplyClient({ areas, userId }: Props) {
     if (!landmark.trim()) { setError('Enter a landmark'); return }
     const fullRaw = '0' + rawPhone.replace(/\D/g, '')
     if (!validatePhone(fullRaw)) { setError('Enter a valid Nigerian mobile number'); return }
-    if (storeType === 'pharmacy' && !pcnLicence.trim()) { setError('Enter your PCN licence number'); return }
+    if (storeType === 'pharmacy' && !pcnLicence.trim()) { setError('Enter your PCN premises licence number'); return }
+    if (!agreementTicked) { setError('You must agree to the Vendor Partner Agreement to continue'); return }
+    if (storeType === 'pharmacy' && !pcnDeclarationTicked) {
+      setError('You must confirm your pharmacy registration to continue')
+      return
+    }
 
     setSaving(true)
+    // Record agreement acceptance before submitting the application
+    await fetch('/api/legal/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slugs: ['vendor_agreement', 'privacy_policy'],
+        role: 'vendor',
+        businessType: storeType,
+      }),
+    })
+
     const phone = normalizePhone(fullRaw)!
     const res = await fetch('/api/applications/submit', {
       method: 'POST',
@@ -144,16 +169,53 @@ export function VendorApplyClient({ areas, userId }: Props) {
         </Field>
 
         {storeType === 'pharmacy' && (
-          <Field label="PCN Licence number">
+          <Field label="PCN premises licence number (required)">
             <input type="text" value={pcnLicence} onChange={e => setPcnLicence(e.target.value)}
               placeholder="e.g. PCN/2023/001234"
               className="h-11 px-3 rounded-xl border border-line font-body text-[15px] text-ink w-full" />
           </Field>
         )}
 
+        {/* Vendor agreement */}
+        <div className="bg-surface rounded-2xl p-4 flex flex-col gap-3">
+          <p className="text-[13px] text-ink-2 leading-snug">
+            Please read the{' '}
+            <Link
+              href={`/legal/vendor-agreement#${SCHEDULE[storeType].anchor}`}
+              target="_blank" rel="noopener noreferrer"
+              className="text-brand underline"
+            >
+              GoCart Vendor Partner Agreement and {SCHEDULE[storeType].label}
+            </Link>
+            {' '}before continuing.
+          </p>
+
+          <CheckboxRow
+            checked={agreementTicked}
+            onChange={setAgreementTicked}
+            label="I agree to the GoCart Vendor Partner Agreement and the schedule for my business, and I am authorised to bind this business."
+          />
+
+          {storeType === 'pharmacy' && (
+            <CheckboxRow
+              checked={pcnDeclarationTicked}
+              onChange={setPcnDeclarationTicked}
+              label="This pharmacy is registered with the Pharmacists Council of Nigeria and will sell only over-the-counter products on GoCart."
+            />
+          )}
+        </div>
+
         {error && <p className="text-[13px] text-danger">{error}</p>}
 
-        <Button onClick={submit} loading={saving} fullWidth size="lg">Submit application</Button>
+        <Button
+          onClick={submit}
+          loading={saving}
+          disabled={!agreementTicked || (storeType === 'pharmacy' && !pcnDeclarationTicked)}
+          fullWidth
+          size="lg"
+        >
+          Submit application
+        </Button>
       </div>
     </div>
   )
@@ -165,5 +227,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-[12px] font-semibold text-ink-2">{label}</span>
       {children}
     </div>
+  )
+}
+
+function CheckboxRow({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)} className="flex items-start gap-3 text-left">
+      <div className={`mt-0.5 w-5 h-5 rounded shrink-0 flex items-center justify-center border-2 transition-colors ${
+        checked ? 'bg-brand border-brand' : 'border-line'
+      }`}>
+        {checked && (
+          <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+            <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
+      <span className="text-[13px] text-ink leading-snug">{label}</span>
+    </button>
   )
 }
