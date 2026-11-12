@@ -30,7 +30,7 @@ export function HelpClient({ userId, settings, tickets: initial, orders, isAdmin
   const supabase = createClient()
 
   const phone = settings.support_phone ?? '+2348000000000'
-  const email = settings.support_email ?? 'hello@dart.ng'
+  const email = settings.support_email ?? 'support@gocartng.com'
   const hours = settings.support_hours ?? 'Mon – Sat · 8 am – 9 pm'
 
   function formatPhone(raw: string) {

@@ -9,7 +9,7 @@ export default async function AddressesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?next=/account/addresses')
 
-  const [{ data: addresses }, { data: areas }] = await Promise.all([
+  const [{ data: addresses }, { data: areas }, { data: spots }] = await Promise.all([
     supabase
       .from('addresses')
       .select('*')
@@ -20,6 +20,10 @@ export default async function AddressesPage() {
       .select('id, name, district, zone_id')
       .eq('status', 'active')
       .order('sort_order'),
+    supabase
+      .from('delivery_spots')
+      .select('id, label, custom_label, description, area_id, is_default, created_at')
+      .order('created_at', { ascending: true }),
   ])
 
   return (
@@ -27,6 +31,7 @@ export default async function AddressesPage() {
       userId={user.id}
       addresses={addresses ?? []}
       areas={areas ?? []}
+      spots={spots ?? []}
     />
   )
 }

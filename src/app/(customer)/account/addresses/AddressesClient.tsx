@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, MapPin, X, Check, Trash2, Edit3 } from 'lucide-react'
+import { ArrowLeft, Plus, MapPin, Navigation, X, Check, Trash2, Edit3 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Toast } from '@/components/ui/Toast'
@@ -15,18 +15,30 @@ interface AreaOption {
   zone_id: string | null
 }
 
+interface SpotOption {
+  id: string
+  label: string
+  custom_label: string | null
+  description: string | null
+  area_id: string | null
+  is_default: boolean
+  created_at: string
+}
+
 interface Props {
   userId: string
   addresses: Address[]
   areas: AreaOption[]
+  spots: SpotOption[]
 }
 
 const LABELS = ['Home', 'Work', 'Other'] as const
 type LabelOption = (typeof LABELS)[number]
 
-export function AddressesClient({ userId, addresses: initial, areas }: Props) {
+export function AddressesClient({ userId, addresses: initial, areas, spots: initialSpots }: Props) {
   const router = useRouter()
   const [addresses, setAddresses] = useState(initial)
+  const [spots, setSpots] = useState(initialSpots)
   const [sheet, setSheet] = useState<null | 'add' | 'edit'>(null)
   const [editing, setEditing] = useState<Address | null>(null)
   const [label, setLabel] = useState<LabelOption>('Home')
@@ -124,6 +136,14 @@ export function AddressesClient({ userId, addresses: initial, areas }: Props) {
     }
   }
 
+  async function removeSpot(spotId: string) {
+    const { error: e } = await supabase.from('delivery_spots').delete().eq('id', spotId)
+    if (!e) {
+      setSpots(prev => prev.filter(s => s.id !== spotId))
+      setToast('Spot removed')
+    }
+  }
+
   async function setDefault(addressId: string) {
     await supabase.from('addresses').update({ is_default: false }).eq('user_id', userId)
     await supabase.from('addresses').update({ is_default: true }).eq('id', addressId)
@@ -154,7 +174,7 @@ export function AddressesClient({ userId, addresses: initial, areas }: Props) {
       </header>
 
       <div className="px-4 pt-4 flex flex-col gap-3">
-        {addresses.length === 0 && (
+        {addresses.length === 0 && spots.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <div className="w-14 h-14 rounded-full bg-brand-tint flex items-center justify-center">
               <MapPin size={24} className="text-brand" />
@@ -224,6 +244,46 @@ export function AddressesClient({ userId, addresses: initial, areas }: Props) {
             className="bg-white rounded-2xl h-[52px] w-full font-bold text-[15px] text-brand flex items-center justify-center gap-2">
             <Plus size={18} /> Add address
           </button>
+        )}
+
+        {/* GPS-pinned delivery spots saved via map */}
+        {spots.length > 0 && (
+          <>
+            <p className="text-[12px] font-semibold text-ink-2 px-1 pt-1">Pinned on map</p>
+            <div className="bg-white rounded-2xl overflow-hidden">
+              {spots.map((spot, i) => (
+                <div key={spot.id} className={`px-4 py-4 ${i < spots.length - 1 ? 'border-b border-line' : ''}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-surface flex items-center justify-center shrink-0 mt-0.5">
+                      <Navigation size={15} className="text-ink-2" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        {spot.label && (
+                          <span className="text-[11px] font-bold text-brand-ink bg-brand-tint px-1.5 py-0.5 rounded-md">
+                            {spot.custom_label ?? spot.label}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-semibold text-ink-2 bg-surface px-1.5 py-0.5 rounded-md">GPS pin</span>
+                      </div>
+                      {spot.description && (
+                        <p className="text-[14px] font-semibold text-ink">{spot.description}</p>
+                      )}
+                      {spot.area_id && (
+                        <p className="text-[12px] text-ink-2 mt-0.5">{areaLabel(spot.area_id)}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 pl-11">
+                    <button type="button" onClick={() => removeSpot(spot.id)}
+                      className="flex items-center gap-1 text-[12px] text-danger font-semibold h-8 px-2.5 rounded-lg bg-red-50">
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
