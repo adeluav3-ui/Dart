@@ -7,6 +7,7 @@ const heading = Bricolage_Grotesque({
   weight: ['700', '800'],
   variable: '--font-heading',
   display: 'swap',
+  preload: false,
 })
 
 const body = Plus_Jakarta_Sans({
@@ -14,6 +15,7 @@ const body = Plus_Jakarta_Sans({
   weight: ['400', '500', '600', '700'],
   variable: '--font-body',
   display: 'swap',
+  preload: false,
 })
 
 export const metadata: Metadata = {
