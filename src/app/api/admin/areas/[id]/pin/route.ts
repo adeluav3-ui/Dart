@@ -34,12 +34,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
   }
 
+  // Setting a pin implies the area is ready — promote it to active
   await admin.from('areas').update({
     lat,
     lng,
     accuracy_m: typeof accuracy_m === 'number' ? accuracy_m : null,
     pin_saved_at: new Date().toISOString(),
     pin_saved_by: user.id,
+    status: 'active',
+    is_active: true,
   }).eq('id', params.id)
 
   return NextResponse.json({ ok: true })
