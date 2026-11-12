@@ -5,6 +5,14 @@ const withPWA = require('next-pwa')({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   customWorkerDir: 'worker',
+  // Exclude internal Next.js manifests — they 404 on old builds and
+  // cause Workbox precache failure, which prevents the SW from activating
+  // (and therefore blocks pushManager.subscribe()).
+  exclude: [
+    /app-build-manifest\.json$/,
+    /_buildManifest\.js$/,
+    /_ssgManifest\.js$/,
+  ],
 })
 
 const nextConfig = {
