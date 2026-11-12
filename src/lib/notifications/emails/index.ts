@@ -15,6 +15,8 @@ import { renderAdminVendorSilent } from './admin_vendor_silent'
 import { renderAdminPaymentIssue } from './admin_payment_issue'
 import { renderAdminNewApplication } from './admin_new_application'
 import { renderVendorNewOrder } from './vendor_new_order'
+import { renderSupportTicketConfirm } from './support_ticket_confirm'
+import { renderAdminSupportTicket } from './admin_support_ticket'
 
 type EmailResult = { html: string; text: string }
 type Renderer = (payload: Record<string, unknown>) => EmailResult
@@ -37,6 +39,8 @@ const renderers: Record<string, Renderer> = {
   admin_vendor_silent:    renderAdminVendorSilent,
   admin_payment_issue:    renderAdminPaymentIssue,
   admin_new_application:  renderAdminNewApplication,
+  support_ticket_confirm: renderSupportTicketConfirm,
+  admin_support_ticket:   renderAdminSupportTicket,
 }
 
 export function renderTemplate(
