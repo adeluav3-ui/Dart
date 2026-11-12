@@ -112,9 +112,11 @@ function LandingFooter() {
         <div>
           <p className="text-white font-semibold text-sm mb-3">Legal</p>
           <ul className="space-y-2 text-sm">
-            <li><Link href="/terms" className="hover:text-white transition-colors">Terms of service</Link></li>
-            <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy policy</Link></li>
+            <li><Link href="/legal/terms" className="hover:text-white transition-colors">Terms of use</Link></li>
+            <li><Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy policy</Link></li>
             <li><Link href="/refunds" className="hover:text-white transition-colors">Refund policy</Link></li>
+            <li><Link href="/legal/vendor-agreement" className="hover:text-white transition-colors">Vendor agreement</Link></li>
+            <li><Link href="/legal/rider-agreement" className="hover:text-white transition-colors">Rider agreement</Link></li>
           </ul>
         </div>
       </div>

@@ -195,12 +195,12 @@ export function AccountClient({ profile, email, applications, userId, version }:
       {/* Legal links sheet */}
       {sheet === 'legal' && (
         <SheetWrapper title="Terms and privacy" onClose={() => setSheet(null)}>
-          <Link href="/terms" onClick={() => setSheet(null)}
+          <Link href="/legal/terms" onClick={() => setSheet(null)}
             className="flex items-center justify-between py-3 border-b border-line no-underline">
             <span className="text-[15px] font-semibold text-ink">Terms of use</span>
             <ChevronRight size={16} className="text-ink-2" />
           </Link>
-          <Link href="/privacy" onClick={() => setSheet(null)}
+          <Link href="/legal/privacy" onClick={() => setSheet(null)}
             className="flex items-center justify-between py-3 border-b border-line no-underline">
             <span className="text-[15px] font-semibold text-ink">Privacy policy</span>
             <ChevronRight size={16} className="text-ink-2" />
