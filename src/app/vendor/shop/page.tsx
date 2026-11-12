@@ -31,7 +31,7 @@ export default async function VendorShopPage() {
     admin
       .from('areas')
       .select('*')
-      .eq('status', 'active')
+      .or('status.eq.active,is_active.eq.true')
       .order('sort_order'),
     admin
       .from('push_subscriptions')

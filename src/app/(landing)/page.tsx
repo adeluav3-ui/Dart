@@ -87,11 +87,15 @@ const STEPS = [
   { n: '4', title: 'Rider brings it', desc: 'Track progress in real time; confirm with your PIN.' },
 ]
 
-const FAQS = [
-  {
-    q: 'Where does GoCart deliver in Sagamu?',
-    a: 'We currently deliver within OOUTH, Hospital Road, Isale-Oko, Akarigbo Road and Ijoku. More areas are coming soon.',
-  },
+function buildFaqs(activeAreaNames: string[]) {
+  const areaList = activeAreaNames.length > 0
+    ? activeAreaNames.join(', ')
+    : 'several areas in Sagamu'
+  return [
+    {
+      q: 'Where does GoCart deliver in Sagamu?',
+      a: `We currently deliver within ${areaList}. More areas are coming soon.`,
+    },
   {
     q: 'How long does delivery take?',
     a: 'Most orders arrive within 20–45 minutes depending on the vendor and your location.',
@@ -112,70 +116,73 @@ const FAQS = [
     q: 'Can I order from a pharmacy for prescription medicine?',
     a: 'Not in the current version. GoCart pharmacies sell over-the-counter products only.',
   },
-]
-
-const JSON_LD = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'Organization',
-      '@id': 'https://gocart.app/#org',
-      name: 'GoCart',
-      url: 'https://gocart.app',
-      logo: 'https://gocart.app/brand/gocart-logo.svg',
-      contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', availableLanguage: 'en' },
-    },
-    {
-      '@type': 'WebSite',
-      '@id': 'https://gocart.app/#website',
-      url: 'https://gocart.app',
-      name: 'GoCart',
-      publisher: { '@id': 'https://gocart.app/#org' },
-    },
-    {
-      '@type': 'LocalBusiness',
-      '@id': 'https://gocart.app/#local',
-      name: 'GoCart',
-      description: 'Food, grocery and pharmacy delivery in Sagamu, Ogun State, Nigeria.',
-      url: 'https://gocart.app',
-      image: 'https://gocart.app/brand/gocart-logo.svg',
-      priceRange: '₦',
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: 'Sagamu',
-        addressRegion: 'Ogun State',
-        addressCountry: 'NG',
-      },
-      areaServed: {
-        '@type': 'City',
-        name: 'Sagamu',
-        containedInPlace: { '@type': 'State', name: 'Ogun State' },
-      },
-    },
-    {
-      '@type': 'Service',
-      '@id': 'https://gocart.app/#service',
-      name: 'GoCart Delivery',
-      provider: { '@id': 'https://gocart.app/#org' },
-      serviceType: 'Local Delivery',
-      areaServed: { '@type': 'City', name: 'Sagamu' },
-      description: 'On-demand delivery of food, groceries and pharmacy items in Sagamu, Ogun State.',
-    },
-    {
-      '@type': 'FAQPage',
-      mainEntity: FAQS.map(faq => ({
-        '@type': 'Question',
-        name: faq.q,
-        acceptedAnswer: { '@type': 'Answer', text: faq.a },
-      })),
-    },
-  ],
+  ]
 }
 
 export default async function LandingPage() {
   const { areas, minFareKobo } = await getData()
   const activeAreas = areas.filter(a => a.status === 'active')
   const comingSoon = areas.filter(a => a.status === 'coming_soon')
+
+  const FAQS = buildFaqs(activeAreas.map(a => a.name))
+
+  const JSON_LD = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://gocart.app/#org',
+        name: 'GoCart',
+        url: 'https://gocart.app',
+        logo: 'https://gocart.app/brand/gocart-logo.svg',
+        contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', availableLanguage: 'en' },
+      },
+      {
+        '@type': 'WebSite',
+        '@id': 'https://gocart.app/#website',
+        url: 'https://gocart.app',
+        name: 'GoCart',
+        publisher: { '@id': 'https://gocart.app/#org' },
+      },
+      {
+        '@type': 'LocalBusiness',
+        '@id': 'https://gocart.app/#local',
+        name: 'GoCart',
+        description: 'Food, grocery and pharmacy delivery in Sagamu, Ogun State, Nigeria.',
+        url: 'https://gocart.app',
+        image: 'https://gocart.app/brand/gocart-logo.svg',
+        priceRange: '₦',
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: 'Sagamu',
+          addressRegion: 'Ogun State',
+          addressCountry: 'NG',
+        },
+        areaServed: {
+          '@type': 'City',
+          name: 'Sagamu',
+          containedInPlace: { '@type': 'State', name: 'Ogun State' },
+        },
+      },
+      {
+        '@type': 'Service',
+        '@id': 'https://gocart.app/#service',
+        name: 'GoCart Delivery',
+        provider: { '@id': 'https://gocart.app/#org' },
+        serviceType: 'Local Delivery',
+        areaServed: { '@type': 'City', name: 'Sagamu' },
+        description: 'On-demand delivery of food, groceries and pharmacy items in Sagamu, Ogun State.',
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: FAQS.map(faq => ({
+          '@type': 'Question',
+          name: faq.q,
+          acceptedAnswer: { '@type': 'Answer', text: faq.a },
+        })),
+      },
+    ],
+  }
 
   return (
     <>
@@ -220,7 +227,7 @@ export default async function LandingPage() {
 
             {/* Area chips */}
             <div className="flex flex-wrap gap-2">
-              {activeAreas.slice(0, 6).map(a => (
+              {activeAreas.map(a => (
                 <Link
                   key={a.id}
                   href={`/delivery/${toSlug(a.name)}`}
