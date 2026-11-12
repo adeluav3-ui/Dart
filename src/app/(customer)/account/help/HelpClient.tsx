@@ -29,7 +29,7 @@ export function HelpClient({ userId, settings, tickets: initial, orders, isAdmin
   const [toast, setToast] = useState('')
   const supabase = createClient()
 
-  const phone = settings.support_phone ?? '+2348000000000'
+  const phone = settings.support_phone ?? null
   const email = settings.support_email ?? 'support@gocartng.com'
   const hours = settings.support_hours ?? 'Mon – Sat · 8 am – 9 pm'
 
@@ -80,16 +80,18 @@ export function HelpClient({ userId, settings, tickets: initial, orders, isAdmin
       <div className="px-4 pt-4 flex flex-col gap-3">
         {/* Contact card */}
         <div className="bg-brand-tint rounded-2xl p-4 flex flex-col gap-3">
-          <a
-            href={`tel:${phone}`}
-            className="h-11 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center gap-2 no-underline"
-          >
-            <Phone size={16} />
-            Call us — {formatPhone(phone)}
-          </a>
+          {phone && (
+            <a
+              href={`tel:${phone}`}
+              className="h-11 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center gap-2 no-underline"
+            >
+              <Phone size={16} />
+              Call us — {formatPhone(phone)}
+            </a>
+          )}
           <a
             href={`mailto:${email}`}
-            className="h-11 rounded-xl bg-white text-brand font-bold text-[14px] flex items-center justify-center gap-2 no-underline border border-brand/20"
+            className="h-11 rounded-xl bg-brand text-white font-bold text-[14px] flex items-center justify-center gap-2 no-underline"
           >
             <Mail size={16} />
             {email}
