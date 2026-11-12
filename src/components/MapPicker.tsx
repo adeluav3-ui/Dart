@@ -18,7 +18,7 @@ interface Props {
   userId?: string | null
 }
 
-// OOUTH Main Gate, Sagamu
+// OOUTH, Sagamu
 const DEFAULT_LAT = 6.7073
 const DEFAULT_LNG = 3.8858
 

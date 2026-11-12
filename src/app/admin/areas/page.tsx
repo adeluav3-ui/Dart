@@ -166,6 +166,7 @@ export default function AdminAreasPage() {
       lng: edit.lng ? parseFloat(edit.lng) : null,
       radius_m: edit.radius_m ? parseInt(edit.radius_m, 10) : 800,
       status: edit.status,
+      is_active: edit.status === 'active',
     }
 
     if (editingId === '__new__') {

@@ -8,8 +8,8 @@ export function renderAtGate(pl: Record<string, unknown>): { html: string; text:
   const orderId = String(pl.order_id ?? '')
 
   const html = emailLayout(`
-    ${h1('Your rider is at the OOUTH Main Gate')}
-    ${p('Please come out now. Your rider is waiting at the <strong>OOUTH Main Gate</strong> and will wait up to 10 minutes.')}
+    ${h1('Your rider is at the OOUTH')}
+    ${p('Please come out now. Your rider is waiting at the <strong>OOUTH</strong> and will wait up to 10 minutes.')}
     ${riderPhone ? p(`Call your rider: ${callLink(riderPhone)}`) : ''}
     ${infoCard('Remember to bring your delivery PIN to confirm receipt.')}
     <p style="margin:12px 0 0;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13px;color:#5B6168;text-align:center">
@@ -19,7 +19,7 @@ export function renderAtGate(pl: Record<string, unknown>): { html: string; text:
   `)
 
   const text = [
-    `Your rider is at the OOUTH Main Gate — Order ${orderCode}`,
+    `Your rider is at the OOUTH — Order ${orderCode}`,
     '',
     'Please come out now. Your rider will wait up to 10 minutes.',
     riderPhone ? `Call your rider: ${riderPhone}` : '',

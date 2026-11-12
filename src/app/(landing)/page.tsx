@@ -90,7 +90,7 @@ const STEPS = [
 const FAQS = [
   {
     q: 'Where does GoCart deliver in Sagamu?',
-    a: 'We currently deliver within OOUTH Main Gate, OOUTH Back Gate, Hospital Road, Isale-Oko, Akarigbo Road and Ijoku. More areas are coming soon.',
+    a: 'We currently deliver within OOUTH, Hospital Road, Isale-Oko, Akarigbo Road and Ijoku. More areas are coming soon.',
   },
   {
     q: 'How long does delivery take?',

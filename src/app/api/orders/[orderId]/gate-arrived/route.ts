@@ -59,7 +59,7 @@ export async function POST(
     p_recipient_role: 'customer',
     p_channel: 'email',
     p_title: 'Your rider is at the gate',
-    p_body: 'Your rider is waiting at the OOUTH Main Gate — come out now.',
+    p_body: 'Your rider is waiting at the OOUTH — come out now.',
     p_url: `/track/${order.id}`,
     p_email_subject: `Your rider is at the gate — order ${order.code}`,
     p_email_template: 'at_gate',
@@ -78,7 +78,7 @@ export async function POST(
     p_recipient_role: 'customer',
     p_channel: 'push',
     p_title: 'Rider at the gate!',
-    p_body: 'Come out now — your rider is at the OOUTH Main Gate.',
+    p_body: 'Come out now — your rider is at the OOUTH.',
     p_url: `/track/${order.id}`,
     p_dedupe_key: `at_gate_push:${order.id}`,
   })
