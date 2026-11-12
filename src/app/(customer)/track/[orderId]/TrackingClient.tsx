@@ -108,6 +108,9 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
   const [now, setNow] = useState(Date.now())
   const [verifying, setVerifying] = useState(false)
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null)
+  const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const { clearCart, cart } = useCart()
 
   // When returning from Monnify (?confirm=1), clear the cart and actively
@@ -245,6 +248,28 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
+
+  async function handleCancel() {
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      const res = await fetch(`/api/orders/${order.id}/transition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toStatus: 'cancelled' }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setCancelError(data.error ?? 'Could not cancel.')
+      } else {
+        setCancelConfirm(false)
+      }
+    } catch {
+      setCancelError('Could not cancel. Please try again.')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   async function checkPayment() {
     if (verifying) return
@@ -551,6 +576,48 @@ export function TrackingClient({ initialOrder, initialEvents, orderItems, isConf
           </div>
         </div>
       </div>
+
+      {/* ── Cancel button — only while status is 'paid' ── */}
+      {status === 'paid' && (
+        <div className="mx-4 mb-4">
+          {!cancelConfirm ? (
+            <button
+              type="button"
+              onClick={() => { setCancelConfirm(true); setCancelError(null) }}
+              className="w-full h-11 rounded-2xl border border-line bg-white text-sm font-semibold text-ink-2"
+            >
+              Cancel order
+            </button>
+          ) : (
+            <div className="bg-red-50 rounded-2xl px-4 py-4 flex flex-col gap-3">
+              <p className="text-sm font-semibold text-ink">Cancel this order?</p>
+              <p className="text-xs text-ink-2 leading-snug">
+                You&apos;ll receive a full refund to your original payment method.
+                This is only possible before the kitchen starts cooking.
+              </p>
+              {cancelError && <p className="text-xs text-danger">{cancelError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="flex-1 h-10 rounded-xl bg-danger text-white text-sm font-bold disabled:opacity-60"
+                >
+                  {cancelling ? 'Cancelling…' : 'Yes, cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCancelConfirm(false); setCancelError(null) }}
+                  disabled={cancelling}
+                  className="flex-1 h-10 rounded-xl bg-white border border-line text-sm font-semibold text-ink-2 disabled:opacity-60"
+                >
+                  Never mind
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Footer ── */}
       <div className="mt-auto px-5 py-4 border-t border-line flex justify-between items-center">

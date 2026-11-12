@@ -70,6 +70,9 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
   const [newCatName, setNewCatName] = useState('')
   const [savingCat, setSavingCat] = useState(false)
   const [priceStr, setPriceStr] = useState(item?.base_price ? String(item.base_price / 100) : '')
+  const [inStorePriceStr, setInStorePriceStr] = useState(
+    item?.in_store_price_kobo ? String(item.in_store_price_kobo / 100) : ''
+  )
   const [packSize, setPackSize] = useState(item?.pack_size ?? '')
   const [photoUrl, setPhotoUrl] = useState<string | null>(item?.photo_url ?? null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -79,7 +82,14 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
   const [error, setError] = useState<string | null>(null)
 
   const priceKobo = Math.round(parseFloat(priceStr || '0') * 100)
-  const valid = name.trim().length > 0
+  const inStorePriceKobo = inStorePriceStr ? Math.round(parseFloat(inStorePriceStr) * 100) : null
+
+  // Client-side price cap warning (server enforces too)
+  const priceCapError = (inStorePriceKobo && inStorePriceKobo > 0 && priceKobo > 0)
+    ? (priceKobo > Math.round(inStorePriceKobo * 1.05) ? 'GoCart price may not exceed in-store price by more than 5 %.' : null)
+    : null
+
+  const valid = name.trim().length > 0 && !priceCapError
 
   async function createCategory() {
     const name = newCatName.trim()
@@ -148,45 +158,61 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
 
     try {
       if (item) {
-        // Edit existing item — all changes go live immediately
+        // Edit existing — upload photo first if changed
         let uploadedUrl: string | null = null
         if (photoBlob) {
           uploadedUrl = await uploadPhoto(item.id)
           if (!uploadedUrl) { setSaving(false); return }
         }
-        const updates: Record<string, unknown> = {
+
+        const body: Record<string, unknown> = {
           name: name.trim(),
           description: description.trim() || null,
           category_id: categoryId || null,
           pack_size: packSize.trim() || null,
-          status: 'live',
+          in_store_price_kobo: inStorePriceKobo,
         }
-        if (priceKobo > 0) updates.base_price = priceKobo
-        if (uploadedUrl) updates.photo_url = uploadedUrl
-        await supabase.from('menu_items').update(updates).eq('id', item.id)
+        if (priceKobo > 0) body.base_price = priceKobo
+        if (uploadedUrl) body.photo_url = uploadedUrl
+
+        const res = await fetch(`/api/vendor/items/${item.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) {
+          const j = await res.json()
+          setError(j.error ?? 'Failed to save item.')
+          setSaving(false)
+          return
+        }
 
         if (isRestaurant(vendor.type)) {
           await saveOptionGroups(item.id)
         }
       } else {
-        // Create new item — go live immediately
-        const { data: newItem, error: insertErr } = await supabase
-          .from('menu_items')
-          .insert({
+        // Create new item
+        const res = await fetch('/api/vendor/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             vendor_id: vendor.id,
             category_id: categoryId || null,
             name: name.trim(),
             description: description.trim() || null,
             base_price: priceKobo,
             pack_size: packSize.trim() || null,
+            in_store_price_kobo: inStorePriceKobo,
             sort_order: 0,
-            is_available: true,
-            status: 'live',
-          })
-          .select()
-          .single()
-
-        if (insertErr || !newItem) { setError('Failed to create item.'); setSaving(false); return }
+          }),
+        })
+        if (!res.ok) {
+          const j = await res.json()
+          setError(j.error ?? 'Failed to create item.')
+          setSaving(false)
+          return
+        }
+        const { item: newItem } = await res.json()
 
         if (photoBlob) {
           const uploadedUrl = await uploadPhoto(newItem.id)
@@ -382,9 +408,9 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
           )}
         </div>
 
-        {/* Price */}
+        {/* GoCart price */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-bold">Price (₦)</label>
+          <label className="text-sm font-bold">GoCart price (₦)</label>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-ink-2">₦</span>
             <input
@@ -399,6 +425,32 @@ export function ItemFormClient({ vendor, categories, item, initialOptionGroups =
           </div>
           {priceKobo > 0 && (
             <span className="text-xs text-ink-2">{formatMoney(priceKobo)}</span>
+          )}
+        </div>
+
+        {/* In-store price */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-bold">
+            In-store / walk-in price (₦)
+            <span className="ml-1 text-xs font-normal text-ink-2">optional</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-ink-2">₦</span>
+            <input
+              type="number"
+              value={inStorePriceStr}
+              onChange={e => setInStorePriceStr(e.target.value)}
+              placeholder="0"
+              min="0"
+              step="0.01"
+              className="w-full h-12 pl-8 pr-4 rounded-2xl border border-line bg-white text-sm font-body"
+            />
+          </div>
+          {inStorePriceKobo != null && inStorePriceKobo > 0 && (
+            <span className="text-xs text-ink-2">{formatMoney(inStorePriceKobo)}</span>
+          )}
+          {priceCapError && (
+            <span className="text-xs text-danger">{priceCapError}</span>
           )}
         </div>
 

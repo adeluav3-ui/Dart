@@ -54,6 +54,9 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
 
   const draftCount = items.filter(i => i.status === 'draft').length
   const rejectedCount = items.filter(i => i.status === 'rejected').length
+  const missingInStorePrice = items.filter(
+    i => i.status === 'live' && i.in_store_price_kobo == null
+  ).length
   const incompleteBannerCount = draftCount + rejectedCount
 
   const catItems = activeCategory === '__all__'
@@ -131,6 +134,23 @@ export function MenuManagerClient({ vendor, initialCategories, initialItems }: P
               : `${incompleteBannerCount} items need attention`}
             {draftCount > 0 && ` — ${draftCount} draft${draftCount > 1 ? 's' : ''} missing price or photo`}
             {rejectedCount > 0 && ` — ${rejectedCount} rejected`}
+          </p>
+        </div>
+      )}
+
+      {/* Missing in-store price banner */}
+      {missingInStorePrice > 0 && (
+        <div className="mx-4 mt-2 px-4 py-3 bg-surface rounded-2xl flex items-start gap-3">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6168" strokeWidth="2" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p className="text-sm text-ink-2 font-medium leading-snug">
+            {missingInStorePrice === 1
+              ? '1 live item is missing its in-store price'
+              : `${missingInStorePrice} live items are missing their in-store price`}
+            {' '}— tap each item to add it.
           </p>
         </div>
       )}

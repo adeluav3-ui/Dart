@@ -56,6 +56,16 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Customers can only cancel while the order is still in 'paid' status
+  if (toStatus === 'cancelled' && isCustomer && !isAdmin) {
+    if (order.status !== 'paid') {
+      return NextResponse.json(
+        { error: "This order can't be cancelled — the kitchen has already started.", code: 'CANNOT_CANCEL' },
+        { status: 400 }
+      )
+    }
+  }
+
   // PIN check for delivery
   if (toStatus === 'delivered') {
     if (!deliveryPin || deliveryPin !== order.delivery_pin) {

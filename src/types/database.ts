@@ -98,6 +98,8 @@ export interface MenuItem {
   is_sold_out: boolean
   pending_price: number | null
   pending_photo_url: string | null
+  in_store_price_kobo: number | null
+  flag_reason: string | null
 }
 
 export interface MenuTemplate {
