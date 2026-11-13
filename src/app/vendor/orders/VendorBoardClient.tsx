@@ -466,22 +466,22 @@ export function VendorBoardClient({ vendor, initialOrders, setupSteps }: Props) 
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={loading === order.id}
-                    onClick={() => transition(order.id, 'cancelled', { note: 'Vendor rejected' })}
-                    className="h-btn px-4.5 rounded-[14px] border border-line bg-white font-body text-[15px] font-bold text-danger disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
+                <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     disabled={loading === order.id || !prepTimes[order.id]}
                     onClick={() => transition(order.id, 'accepted', { prepMins: prepTimes[order.id] })}
-                    className="flex-1 h-btn rounded-[14px] border-0 bg-brand font-body text-[17px] font-extrabold text-white disabled:opacity-50"
+                    className="w-full h-btn rounded-[14px] border-0 bg-brand font-body text-[17px] font-extrabold text-white disabled:opacity-50"
                   >
                     {loading === order.id ? 'Accepting…' : 'Accept order'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading === order.id}
+                    onClick={() => transition(order.id, 'cancelled', { note: 'Vendor rejected' })}
+                    className="w-full h-btn-sm rounded-[14px] border border-danger/40 bg-white font-body text-[14px] font-bold text-danger disabled:opacity-50"
+                  >
+                    Reject order
                   </button>
                 </div>
               </>
