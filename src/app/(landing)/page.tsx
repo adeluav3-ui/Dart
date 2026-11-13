@@ -348,47 +348,80 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Areas ── */}
-      <section id="areas" aria-labelledby="areas-heading" className="bg-white py-14 lg:py-20">
+      <section id="areas" aria-labelledby="areas-heading" className="bg-canvas py-14 lg:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h2
-            id="areas-heading"
-            className="font-heading font-extrabold text-2xl sm:text-3xl text-ink mb-2"
-          >
-            Where we deliver in Sagamu
-          </h2>
-          <p className="text-ink-2 mb-8">
-            We cover the most active parts of Sagamu and are expanding fast.
-          </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
-            {activeAreas.map(a => (
-              <Link
-                key={a.id}
-                href={`/delivery/${toSlug(a.name)}`}
-                className="flex items-center gap-2 p-3 rounded-2xl border border-line hover:border-brand/40 hover:bg-brand-tint/50 transition-colors"
+          {/* Header row */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5 mb-10">
+            <div>
+              {activeAreas.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 bg-brand text-white text-xs font-bold px-3 py-1 rounded-full mb-4">
+                  <MapPin className="w-3 h-3" />
+                  {activeAreas.length} area{activeAreas.length !== 1 ? 's' : ''} live
+                </span>
+              )}
+              <h2
+                id="areas-heading"
+                className="font-heading font-extrabold text-2xl sm:text-3xl text-ink mb-2"
               >
-                <MapPin className="w-4 h-4 text-brand shrink-0" />
-                <span className="text-sm font-semibold text-ink leading-tight">{a.name}</span>
-              </Link>
-            ))}
-            {comingSoon.map(a => (
-              <div
-                key={a.id}
-                className="flex items-center gap-2 p-3 rounded-2xl border border-line bg-surface opacity-60"
-              >
-                <MapPin className="w-4 h-4 text-ink-2 shrink-0" />
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-ink-2 leading-tight">{a.name}</span>
-                  <span className="text-[10px] text-ink-2 mt-0.5">Coming soon</span>
-                </div>
-              </div>
-            ))}
+                Where we deliver in Sagamu
+              </h2>
+              <p className="text-ink-2 max-w-md">
+                We cover the most active parts of Sagamu and are expanding fast. Tap an area to see what&apos;s available near you.
+              </p>
+            </div>
+            <Link
+              href="/start"
+              className="shrink-0 self-start h-10 px-5 rounded-2xl bg-brand text-white text-sm font-bold inline-flex items-center gap-1.5 hover:bg-brand-dark transition-colors"
+            >
+              Order now <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
+
+          {/* Active areas grid */}
+          {activeAreas.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {activeAreas.map(a => (
+                <Link
+                  key={a.id}
+                  href={`/delivery/${toSlug(a.name)}`}
+                  className="group flex items-center gap-4 bg-white rounded-2xl p-5 border border-line hover:border-brand/30 hover:shadow-sm transition-all"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-brand-tint flex items-center justify-center shrink-0 group-hover:bg-brand transition-colors">
+                    <MapPin className="w-5 h-5 text-brand group-hover:text-white transition-colors" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[15px] text-ink leading-snug">{a.name}</p>
+                    <p className="text-xs text-brand font-medium mt-0.5">Delivering now</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-ink-2 shrink-0 group-hover:text-brand transition-colors" />
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Coming soon strip */}
+          {comingSoon.length > 0 && (
+            <div className="bg-white rounded-2xl border border-line p-5 mb-5">
+              <p className="text-[11px] font-bold text-ink-2 uppercase tracking-widest mb-3">Coming soon</p>
+              <div className="flex flex-wrap gap-2">
+                {comingSoon.map(a => (
+                  <span
+                    key={a.id}
+                    className="inline-flex items-center gap-1.5 bg-surface text-ink-2 text-sm font-medium px-3 py-1.5 rounded-full"
+                  >
+                    <Clock className="w-3 h-3" />
+                    {a.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <p className="text-sm text-ink-2">
             Don&apos;t see your area?{' '}
             <Link href="/start" className="text-brand font-semibold hover:underline">
-              Request it in the app
+              Request it in the app →
             </Link>
           </p>
         </div>
