@@ -22,6 +22,7 @@ export default async function HomePage() {
       .from('vendors')
       .select('*, menu_categories(name)')
       .eq('is_verified', true)
+      .eq('is_active', true)
       .order('is_open', { ascending: false })
       .order('rating_avg', { ascending: false }),
     supabase.from('zones').select('*').eq('is_active', true).order('name'),

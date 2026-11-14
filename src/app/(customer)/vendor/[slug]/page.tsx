@@ -22,6 +22,7 @@ export default async function VendorPage({ params }: { params: { slug: string } 
       )
     `)
     .eq('slug', params.slug)
+    .eq('is_active', true)
     .single()
 
   if (!raw) notFound()

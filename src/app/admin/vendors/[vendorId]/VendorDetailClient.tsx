@@ -34,6 +34,7 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
   const [options, setOptions] = useState(initialOptions)
   const [saving, setSaving] = useState(false)
   const [savingPin, setSavingPin] = useState(false)
+  const [togglingActive, setTogglingActive] = useState(false)
   const [showPinMap, setShowPinMap] = useState(false)
   const [allRiders, setAllRiders] = useState<RiderRow[]>([])
   const supabase = createClient()
@@ -79,6 +80,24 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
       payout_account_name: vendor.payout_account_name,
     }).eq('id', vendor.id)
     setSaving(false)
+  }
+
+  async function toggleActive() {
+    const next = !vendor.is_active
+    const confirmed = window.confirm(
+      next
+        ? `Reactivate ${vendor.name}? They will appear on the customer home page again.`
+        : `Deactivate ${vendor.name}? They will be hidden from all customers immediately.`
+    )
+    if (!confirmed) return
+    setTogglingActive(true)
+    const res = await fetch(`/api/admin/vendors/${vendor.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: next }),
+    })
+    if (res.ok) setVendor(v => ({ ...v, is_active: next }))
+    setTogglingActive(false)
   }
 
   async function saveVendorPin(lat: number, lng: number) {
@@ -205,6 +224,31 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
             <Button onClick={() => setShowPinMap(true)} loading={savingPin} size="sm">
               {vendor.lat != null ? 'Update pin' : 'Set pin'}
             </Button>
+          </div>
+
+          {/* Activation */}
+          <div className="border-t border-line pt-4 flex flex-col gap-2">
+            {!vendor.is_active && (
+              <p className="text-xs font-semibold text-danger bg-red-50 rounded-xl px-3 py-2">
+                This vendor is deactivated — hidden from all customers.
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={togglingActive}
+              onClick={toggleActive}
+              className={`h-9 px-4 rounded-xl text-sm font-bold border-0 disabled:opacity-50 ${
+                vendor.is_active
+                  ? 'bg-red-50 text-danger'
+                  : 'bg-brand-tint text-brand-ink'
+              }`}
+            >
+              {togglingActive
+                ? 'Saving…'
+                : vendor.is_active
+                  ? 'Deactivate vendor'
+                  : 'Reactivate vendor'}
+            </button>
           </div>
         </div>
       )}
