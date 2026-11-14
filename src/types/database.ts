@@ -49,6 +49,7 @@ export interface Vendor {
   category: string | null
   cover_photo_url: string | null
   description: string | null
+  is_active: boolean
   is_verified: boolean
   is_open: boolean
   avg_prep_mins: number
