@@ -12,6 +12,16 @@ export default async function AdminSupportPage() {
     .select('*, profiles(full_name, phone), orders(code)')
     .order('created_at', { ascending: false })
 
+  // Fetch emails from auth.users for each unique user_id
+  const userIds = [...new Set((raw ?? []).map((t: { user_id: string | null }) => t.user_id).filter(Boolean) as string[])]
+  const emailMap: Record<string, string> = {}
+  await Promise.all(
+    userIds.map(async (uid) => {
+      const { data } = await admin.auth.admin.getUserById(uid)
+      if (data.user?.email) emailMap[uid] = data.user.email
+    })
+  )
+
   const tickets = (raw ?? []).map((t: {
     id: string
     user_id: string | null
@@ -36,6 +46,7 @@ export default async function AdminSupportPage() {
     updated_at: t.updated_at,
     customer_name: t.profiles?.full_name ?? null,
     customer_phone: t.profiles?.phone ?? null,
+    customer_email: t.user_id ? (emailMap[t.user_id] ?? null) : null,
     order_code: t.orders?.code ?? null,
   }))
 

@@ -15,6 +15,7 @@ interface TicketRow {
   updated_at: string
   customer_name: string | null
   customer_phone: string | null
+  customer_email: string | null
   order_code: string | null
 }
 
@@ -100,8 +101,13 @@ export function SupportClient({ initialTickets }: Props) {
                     {ticket.status}
                   </span>
                 </div>
+                {ticket.customer_email && (
+                  <a href={`mailto:${ticket.customer_email}`} className="text-[13px] text-brand block">
+                    {ticket.customer_email}
+                  </a>
+                )}
                 {ticket.customer_phone && (
-                  <a href={`tel:${ticket.customer_phone}`} className="text-[13px] text-brand block">
+                  <a href={`tel:${ticket.customer_phone}`} className="text-[13px] text-ink-2 block">
                     {ticket.customer_phone}
                   </a>
                 )}
