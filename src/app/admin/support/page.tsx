@@ -13,7 +13,7 @@ export default async function AdminSupportPage() {
     .order('created_at', { ascending: false })
 
   // Fetch emails from auth.users for each unique user_id
-  const userIds = [...new Set((raw ?? []).map((t: { user_id: string | null }) => t.user_id).filter(Boolean) as string[])]
+  const userIds = Array.from(new Set((raw ?? []).map((t: { user_id: string | null }) => t.user_id).filter(Boolean) as string[]))
   const emailMap: Record<string, string> = {}
   await Promise.all(
     userIds.map(async (uid) => {
