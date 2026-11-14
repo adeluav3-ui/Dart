@@ -43,7 +43,7 @@ export default async function AdminOverviewPage() {
     admin.from('orders').select('*', { count: 'exact', head: true })
       .eq('status', 'delivered').gte('delivered_at', todayISO),
     admin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer'),
-    admin.from('vendors').select('*', { count: 'exact', head: true }).eq('is_active', true),
+    admin.from('vendors').select('*', { count: 'exact', head: true }).eq('is_verified', true).eq('is_active', true),
     admin.from('riders').select('*', { count: 'exact', head: true }).eq('is_active', true),
     admin.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'submitted'),
     admin.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),

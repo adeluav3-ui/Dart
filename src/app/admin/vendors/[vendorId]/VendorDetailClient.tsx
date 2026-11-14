@@ -35,6 +35,7 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
   const [saving, setSaving] = useState(false)
   const [savingPin, setSavingPin] = useState(false)
   const [togglingActive, setTogglingActive] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [showPinMap, setShowPinMap] = useState(false)
   const [allRiders, setAllRiders] = useState<RiderRow[]>([])
   const supabase = createClient()
@@ -98,6 +99,21 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
     })
     if (res.ok) setVendor(v => ({ ...v, is_active: next }))
     setTogglingActive(false)
+  }
+
+  async function deleteVendor() {
+    const confirmed = window.confirm(
+      `Permanently delete ${vendor.name}?\n\n` +
+      `• Their shop disappears from GoCart immediately\n` +
+      `• All menu items are deleted\n` +
+      `• The owner's account reverts to a customer account\n` +
+      `• Past order history is preserved\n\n` +
+      `This cannot be undone.`
+    )
+    if (!confirmed) return
+    setDeleting(true)
+    await fetch(`/api/admin/vendors/${vendor.id}`, { method: 'DELETE' })
+    window.location.href = '/admin/vendors'
   }
 
   async function saveVendorPin(lat: number, lng: number) {
@@ -248,6 +264,14 @@ export function VendorDetailClient({ vendor: initialVendor, categories: initialC
                 : vendor.is_active
                   ? 'Deactivate vendor'
                   : 'Reactivate vendor'}
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={deleteVendor}
+              className="h-9 px-4 rounded-xl text-sm font-bold border border-danger/30 bg-white text-danger disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : 'Delete vendor account permanently'}
             </button>
           </div>
         </div>

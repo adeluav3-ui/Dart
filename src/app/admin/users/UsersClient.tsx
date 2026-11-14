@@ -36,6 +36,7 @@ export function UsersClient({ users, zones }: Props) {
   const [vendorSheetUser, setVendorSheetUser] = useState<UserRow | null>(null)
   const [confirmRider, setConfirmRider] = useState<UserRow | null>(null)
   const [confirmDemote, setConfirmDemote] = useState<UserRow | null>(null)
+  const [confirmBan, setConfirmBan] = useState<UserRow | null>(null)
   const router = useRouter()
 
   const filtered = users.filter(u => {
@@ -60,6 +61,17 @@ export function UsersClient({ users, zones }: Props) {
       return
     }
     setConfirmRider(null)
+    router.refresh()
+  }
+
+  async function banCustomer(userId: string) {
+    const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      alert(j.error ?? 'Failed')
+      return
+    }
+    setConfirmBan(null)
     router.refresh()
   }
 
@@ -128,6 +140,13 @@ export function UsersClient({ users, zones }: Props) {
                     >
                       Make rider
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmBan(user)}
+                      className="h-8 px-3 rounded-xl bg-white border border-danger/30 text-danger text-[13px] font-bold"
+                    >
+                      Ban account
+                    </button>
                   </>
                 )}
                 {(user.role === 'vendor' || user.role === 'rider') && (
@@ -170,6 +189,18 @@ export function UsersClient({ users, zones }: Props) {
         />
       )}
 
+      {/* Confirm Ban */}
+      {confirmBan && (
+        <ConfirmSheet
+          title="Ban account"
+          message={`Permanently ban ${confirmBan.full_name || confirmBan.email}?\n\nThey will be signed out immediately and can never log in or register again with this email or phone number. This cannot be undone.`}
+          confirmLabel="Yes, ban permanently"
+          danger
+          onConfirm={() => banCustomer(confirmBan.id)}
+          onClose={() => setConfirmBan(null)}
+        />
+      )}
+
       {/* Confirm Demote */}
       {confirmDemote && (
         <ConfirmSheet
@@ -196,7 +227,7 @@ function VendorSheet({
   const [slug, setSlug] = useState(slugify(user.full_name ?? ''))
   const [type, setType] = useState('restaurant')
   const [zoneId, setZoneId] = useState(zones[0]?.id ?? '')
-  const [commission, setCommission] = useState('10')
+  const [commission, setCommission] = useState('5')
   const [prepMins, setPrepMins] = useState('30')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -328,11 +359,12 @@ function VendorSheet({
 }
 
 function ConfirmSheet({
-  title, message, confirmLabel, onConfirm, onClose,
+  title, message, confirmLabel, danger, onConfirm, onClose,
 }: {
   title: string
   message: string
   confirmLabel: string
+  danger?: boolean
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -362,9 +394,16 @@ function ConfirmSheet({
             className="flex-1 h-11 rounded-xl bg-surface text-ink text-[14px] font-bold">
             Cancel
           </button>
-          <Button onClick={handle} loading={loading} fullWidth size="lg">
-            {confirmLabel}
-          </Button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handle}
+            className={`flex-1 h-11 rounded-xl text-[14px] font-bold disabled:opacity-50 ${
+              danger ? 'bg-danger text-white' : 'bg-brand text-white'
+            }`}
+          >
+            {loading ? 'Working…' : confirmLabel}
+          </button>
         </div>
       </div>
     </>

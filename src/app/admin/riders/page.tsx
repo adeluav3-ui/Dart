@@ -86,6 +86,19 @@ export default function AdminRidersPage() {
     setRiders(prev => prev.map(r => r.id === rider.id ? { ...r, is_active: !r.is_active } : r))
   }
 
+  async function deleteRider(rider: RiderRow) {
+    const confirmed = window.confirm(
+      `Remove ${rider.full_name ?? 'this rider'} permanently?\n\n` +
+      `• They lose rider dashboard access immediately\n` +
+      `• Their account reverts to a customer account\n` +
+      `• Past delivery history is preserved\n\n` +
+      `This cannot be undone.`
+    )
+    if (!confirmed) return
+    await fetch(`/api/admin/riders/${rider.id}`, { method: 'DELETE' })
+    setRiders(prev => prev.filter(r => r.id !== rider.id))
+  }
+
   return (
     <div className="max-w-lg mx-auto flex flex-col gap-4">
       <h2 className="font-heading font-bold text-xl">Riders</h2>
@@ -116,6 +129,13 @@ export default function AdminRidersPage() {
             className={`relative w-11 h-6 rounded-full border-0 cursor-pointer transition-colors ${rider.is_active ? 'bg-brand' : 'bg-[#C3C8CD]'}`}
           >
             <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${rider.is_active ? 'left-5' : 'left-0.5'}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => deleteRider(rider)}
+            className="h-8 px-3 rounded-xl bg-white border border-danger/30 text-danger text-[12px] font-bold"
+          >
+            Delete
           </button>
         </div>
       ))}
